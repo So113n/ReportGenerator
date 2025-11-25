@@ -87,19 +87,20 @@ namespace ReportGenerator.Database.DbControllers
                     await connection.OpenAsync();
 
                     var query = @"
-                    SELECT 
-                        id,
-                        incident_number,
-                        registration_time,
-                        service,
-                        short_description,
-                        applicant,
-                        priority,
-                        executor,
-                        decision_time,
-                        status
-                    FROM report_inscents 
-                    WHERE DATE(registration_time) BETWEEN @startDate AND @endDate";
+                SELECT
+                    tickets.id                           AS id,
+                    tickets.id                           AS incident_number,
+                    tickets.date_creation                AS registration_time,
+                        ''                                   AS service,
+                    tickets.content                      AS short_description,
+                    CONCAT(users.realname, ' ', users.firstname) AS applicant,
+                    tickets.priority                     AS priority,
+                        ''                                   AS executor,
+                    tickets.solvedate                    AS decision_time,
+                    tickets.status                       AS status
+                FROM glpi_tickets AS tickets
+                LEFT JOIN glpi_users AS users ON tickets.users_id_recipient = users.id
+                WHERE DATE(tickets.date_creation) BETWEEN @startDate AND @endDate";
 
                     await using (var command = new MySqlCommand(query, connection))
                     {
@@ -154,24 +155,29 @@ namespace ReportGenerator.Database.DbControllers
         private string BuildQuery(ReportPeriod period)
         {
             var baseQuery = @"
-            SELECT 
-                id,
-                incident_number,
-                registration_time,
-                service,
-                short_description,
-                applicant,
-                priority,
-                executor,
-                decision_time,
-                status
-            FROM report_inscents";
+            SELECT
+                tickets.id                           AS id,
+                tickets.id                           AS incident_number,
+                tickets.date_creation                AS registration_time,
+                 ''                                   AS service,
+                tickets.content                      AS short_description,
+                CONCAT(users.realname, ' ', users.firstname) AS applicant,
+                tickets.priority                     AS priority,
+                 ''                                   AS executor,
+                tickets.solvedate                    AS decision_time,
+                tickets.status                       AS status
+            FROM glpi_tickets AS tickets
+            LEFT JOIN glpi_users AS users ON tickets.users_id_recipient = users.id";
 
             return period switch
             {
-                ReportPeriod.OneDay => $"{baseQuery} WHERE DATE(registration_time) = CURDATE()",
-                ReportPeriod.Month => $"{baseQuery} WHERE MONTH(registration_time) = MONTH(CURDATE()) AND YEAR(registration_time) = YEAR(CURDATE())",
-                ReportPeriod.ThreeMonths => $"{baseQuery} WHERE DATE(registration_time) BETWEEN @startDate AND @endDate",
+                ReportPeriod.OneDay =>
+                    baseQuery + " WHERE DATE(tickets.date_creation) = CURDATE()",
+                ReportPeriod.Month =>
+                    baseQuery + " WHERE MONTH(tickets.date_creation) = MONTH(CURDATE()) " +
+                                "AND YEAR(tickets.date_creation) = YEAR(CURDATE())",
+                ReportPeriod.ThreeMonths =>
+                    baseQuery + " WHERE DATE(tickets.date_creation) BETWEEN @startDate AND @endDate",
                 ReportPeriod.AllTime => baseQuery,
                 _ => throw new ArgumentException("Неизвестный период выборки")
             };
@@ -179,19 +185,55 @@ namespace ReportGenerator.Database.DbControllers
 
         private DbIncidentData MapReaderToIncidentData(IDataReader reader)
         {
-            return new DbIncidentData
-            {
-                Id = reader.IsDBNull(0) ? 0 : reader.GetInt32(0),
-                NumerIncident = reader.IsDBNull(1) ? 0 : reader.GetInt32(1),
-                RegistrationTime = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
-                Service = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
-                ShortDescription = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
-                Applicant = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
-                Priority = reader.IsDBNull(6) ? 0 : reader.GetInt32(6),
-                Executor = reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
-                DecisionTime = reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
-                Status = reader.IsDBNull(9) ? 0 : reader.GetInt32(9)
-            };
+            var data = new DbIncidentData();
+
+            data.Id = reader["id"] == DBNull.Value
+                ? 0
+                : Convert.ToInt32(reader["id"]);
+
+            data.NumerIncident = reader["incident_number"] == DBNull.Value
+                ? 0
+                : Convert.ToInt32(reader["incident_number"]);
+
+            data.RegistrationTime = reader["registration_time"] == DBNull.Value
+                ? string.Empty
+                : reader["registration_time"].ToString();
+
+            data.Service = reader["service"] == DBNull.Value
+                ? string.Empty
+                : reader["service"].ToString();
+
+            data.ShortDescription = reader["short_description"] == DBNull.Value
+                ? string.Empty
+                : reader["short_description"].ToString();
+
+            data.Applicant = reader["applicant"] == DBNull.Value
+                ? string.Empty
+                : reader["applicant"].ToString();
+
+            data.Priority = reader["priority"] == DBNull.Value
+                ? 0
+                : Convert.ToInt32(reader["priority"]);
+
+            data.Executor = reader["executor"] == DBNull.Value
+                ? string.Empty
+                : reader["executor"].ToString();
+
+            data.DecisionTime = reader["decision_time"] == DBNull.Value
+                ? string.Empty
+                : reader["decision_time"].ToString();
+
+            data.Status = reader["status"] == DBNull.Value
+                ? 0
+                : Convert.ToInt32(reader["status"]);
+
+     
+            data.Content = data.ShortDescription;
+            data.RealName = string.Empty;
+            data.FirstName = string.Empty;
+            data.SolvedDate = null;
+
+            return data;
         }
 
         // Дополнительные вспомогательные методы

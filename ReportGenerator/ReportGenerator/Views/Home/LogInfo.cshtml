@@ -1,0 +1,147 @@
+﻿@model ReportGenerator.Models.LogModel
+
+@{
+    ViewData["Title"] = "LogInfo";
+}
+
+<h1>@ViewData["Title"]</h1>
+
+<div class="container mt-4">
+    <!-- Информация о файле -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-file-text"></i> Информация о лог-файле
+            </h5>
+        </div>
+        <div class="card-body">
+            <p><strong>Путь к файлу:</strong> @Model.LogFilePath</p>
+            <p><strong>Количество записей:</strong> @Model.LogEntries.Count</p>
+
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+            {
+                <div class="alert alert-danger" role="alert">
+                    <i class="bi bi-exclamation-triangle"></i> @Model.ErrorMessage
+                </div>
+            }
+
+            @if (!System.IO.File.Exists(Model.LogFilePath))
+            {
+                <div class="alert alert-warning" role="alert">
+                    <i class="bi bi-exclamation-circle"></i> Файл не существует
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Кнопки действий -->
+    <div class="mb-3">
+        <a href="@Url.Action("LogInfo")" class="btn btn-primary me-2">
+            <i class="bi bi-arrow-clockwise"></i> Обновить
+        </a>
+        <button onclick="clearLog()" class="btn btn-danger me-2">
+            <i class="bi bi-trash"></i> Очистить лог
+        </button>
+        <button onclick="downloadLog()" class="btn btn-success">
+            <i class="bi bi-download"></i> Скачать лог
+        </button>
+    </div>
+
+    <!-- Содержимое лога -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-list-ul"></i> Записи лога (@Model.LogEntries.Count)
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            @if (Model.LogEntries.Any())
+            {
+                <div class="log-container" style="max-height: 600px; overflow-y: auto;">
+                    <table class="table table-striped table-hover mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th style="width: 150px;">Время</th>
+                                <th>Сообщение</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var logEntry in Model.LogEntries)
+                            {
+                                <tr>
+                                    <td class="text-nowrap text-muted small">
+                                        @if (!string.IsNullOrEmpty(logEntry) && logEntry.Length > 20)
+                                        {
+                                            @logEntry.Substring(0, 19)
+                                        }
+                                    </td>
+                                    <td>
+                                        <pre class="log-entry mb-0">@logEntry</pre>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center p-4">
+                    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-2">Лог-файл пуст или не содержит записей</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Функция для очистки лога
+        function clearLog() {
+            if (confirm('Вы уверены, что хотите очистить лог-файл?')) {
+                fetch('@Url.Action("ClearLog")', {
+                    method: 'POST',
+                    headers: {
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Лог успешно очищен');
+                        location.reload();
+                    } else {
+                        alert('Ошибка: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    alert('Ошибка сети: ' + error.message);
+                });
+            }
+        }
+
+        // Функция для скачивания лога
+        function downloadLog() {
+            window.location.href = '@Url.Action("DownloadLog")';
+        }
+
+        // Подсветка уровней логов
+        document.addEventListener('DOMContentLoaded', function() {
+            const logEntries = document.querySelectorAll('.log-entry');
+            logEntries.forEach(entry => {
+                const text = entry.textContent;
+                if (text.includes('ERROR')) {
+                    entry.style.color = '#dc3545';
+                    entry.style.fontWeight = 'bold';
+                } else if (text.includes('WARN') || text.includes('WARNING')) {
+                    entry.style.color = '#ffc107';
+                } else if (text.includes('INFO')) {
+                    entry.style.color = '#0dcaf0';
+                } else if (text.includes('DEBUG')) {
+                    entry.style.color = '#6c757d';
+                }
+            });
+        });
+    </script>
+}

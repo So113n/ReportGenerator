@@ -1,0 +1,363 @@
+﻿@{
+    ViewData["Title"] = "Главная";
+}
+
+<div class="container mt-5">
+    <!-- Заголовок -->
+    <div class="text-center mb-4">
+        <h2>Генератор отчетности 2.0</h2>
+    </div>
+
+    <!-- Выбор периода -->
+    <div class="row mb-3">
+        <div class="col-md-3 text-end">
+            <label class="col-form-label">Выберите период:</label>
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" id="periodSelect">
+                <option value="1">За 1 день</option>
+                <option value="30">Месяц</option>
+                <option value="90">Три месяца</option>
+                <option value="0">Весь период</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Выбор формата -->
+    <div class="row mb-4">
+        <div class="col-md-3 text-end">
+            <label class="col-form-label">Выберите формат отчета:</label>
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" id="formatSelect">
+                <option value="excel">Excel</option>
+                @* <option value="pdf">PDF</option> *@
+            </select>
+        </div>
+    </div>
+
+    <!-- Кнопки -->
+    <div class="row mb-4">
+        <div class="col-md-6 text-center">
+            <button type="button" class="btn btn-primary me-2" id="generateBtn">
+                <span id="generateText">Сгенерировать</span>
+                <span id="generateSpinner" class="spinner-border spinner-border-sm d-none" role="status">
+                    <span class="visually-hidden">Загрузка...</span>
+                </span>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                Настройки
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно настроек -->
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="settingsModalLabel">Настройки подключения</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="connectionString" class="form-label">Введите строку подключения:</label>
+                    <input type="text" class="form-control" id="connectionString"
+                           placeholder="Server=host;Port=3306;Database=db_name;Uid=user;Pwd=password;">
+                    <div class="form-text">Пример: Server=localhost;Port=3306;Database=461_db;Uid=root;Pwd=password;</div>
+                </div>
+                <div id="connectionTestResult" class="alert d-none" role="alert"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                @* <button type="button" class="btn btn-info" id="testConnectionBtn">Тестировать</button> *@
+                <button type="button" class="btn btn-primary" id="applySettingsBtn">Применить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Получаем элементы
+            const generateBtn = document.getElementById('generateBtn');
+            const generateText = document.getElementById('generateText');
+            const generateSpinner = document.getElementById('generateSpinner');
+            const periodSelect = document.getElementById('periodSelect');
+            const formatSelect = document.getElementById('formatSelect');
+
+            const settingsModal = document.getElementById('settingsModal');
+            const connectionStringInput = document.getElementById('connectionString');
+            const applySettingsBtn = document.getElementById('applySettingsBtn');
+
+            // Функция для показа спиннера
+            function showLoading() {
+                generateBtn.disabled = true;
+                generateText.classList.add('d-none');
+                generateSpinner.classList.remove('d-none');
+                generateBtn.classList.add('disabled');
+            }
+
+            // Функция для скрытия спиннера
+            function hideLoading() {
+                generateBtn.disabled = false;
+                generateText.classList.remove('d-none');
+                generateSpinner.classList.add('d-none');
+                generateBtn.classList.remove('disabled');
+            }
+
+            // Функция для получения имени файла из заголовков
+            function getFileNameFromHeaders(response) {
+                const contentDisposition = response.headers.get('Content-Disposition');
+                if (contentDisposition) {
+                    const fileNameMatch = contentDisposition.match(/filename="?(.+)"?/);
+                    if (fileNameMatch && fileNameMatch.length === 2) {
+                        return fileNameMatch[1];
+                    }
+                }
+                return 'report';
+            }
+
+            // Функция для скачивания файла
+            function downloadFile(blob, fileName) {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }
+
+            // Обработчик для кнопки "Сгенерировать"
+            generateBtn.addEventListener('click', async function() {
+                const period = periodSelect.value;
+                const format = formatSelect.value;
+
+                // Валидация выбора
+                if (!period || !format) {
+                    alert('Пожалуйста, выберите период и формат отчета');
+                    return;
+                }
+
+                showLoading();
+
+                try {
+                    const response = await fetch('/Home/GenerateReport', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            period: period,
+                            format: format
+                        })
+                    });
+
+                    if (response.ok) {
+                        // Проверяем, является ли ответ файлом
+                        const contentType = response.headers.get('content-type');
+                        if (contentType && (contentType.includes('application/pdf') ||
+                                           contentType.includes('application/vnd.openxmlformats'))) {
+                            // Это файл - скачиваем
+                            const blob = await response.blob();
+                            const fileName = getFileNameFromHeaders(response);
+                            downloadFile(blob, fileName);
+                            alert('Отчет успешно сгенерирован и скачан!');
+                        } else {
+                            // Это JSON ответ (вероятно ошибка)
+                            const result = await response.json();
+                            if (result.success === false) {
+                                alert('Ошибка: ' + result.message);
+                            } else {
+                                alert('Неизвестный формат ответа от сервера');
+                            }
+                        }
+                    } else {
+                        // Обработка HTTP ошибок
+                        try {
+                            const errorData = await response.json();
+                            alert('Ошибка: ' + (errorData.message || 'Неизвестная ошибка'));
+                        } catch {
+                            alert(`Ошибка сервера: ${response.status} ${response.statusText}`);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Ошибка:', error);
+                    alert('Произошла сетевая ошибка: ' + error.message);
+                } finally {
+                    hideLoading();
+                }
+            });
+
+            // Дополнительно: обработка нажатия Enter в полях ввода
+            document.querySelectorAll('select').forEach(select => {
+                select.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        generateBtn.click();
+                    }
+                });
+            });
+
+            // Дополнительно: кэширование выбора пользователя
+            function saveUserPreferences() {
+                const preferences = {
+                    period: periodSelect.value,
+                    format: formatSelect.value
+                };
+                localStorage.setItem('reportPreferences', JSON.stringify(preferences));
+            }
+
+            function loadUserPreferences() {
+                const saved = localStorage.getItem('reportPreferences');
+                if (saved) {
+                    try {
+                        const preferences = JSON.parse(saved);
+                        periodSelect.value = preferences.period || '';
+                        formatSelect.value = preferences.format || '';
+                    } catch (e) {
+                        console.warn('Не удалось загрузить настройки:', e);
+                    }
+                }
+            }
+
+            // Сохраняем настройки при изменении
+            periodSelect.addEventListener('change', saveUserPreferences);
+            formatSelect.addEventListener('change', saveUserPreferences);
+
+            // Загружаем настройки при загрузке страницы
+            loadUserPreferences();
+
+            // При открытии модального окна загружаем текущую строку подключения
+            settingsModal.addEventListener('show.bs.modal', async function() {
+                try {
+                    const response = await fetch('/Home/GetConnectionString');
+                    if (response.ok) {
+                        const data = await response.json();
+                        connectionStringInput.value = data.connectionString || '';
+                    } else {
+                        console.error('Ошибка при получении строки подключения');
+                    }
+                } catch (error) {
+                    console.error('Ошибка:', error);
+                    alert('Не удалось загрузить текущие настройки');
+                }
+            });
+
+            // Обработчик для кнопки "Применить"
+            applySettingsBtn.addEventListener('click', async function() {
+                const newConnectionString = connectionStringInput.value.trim();
+
+                if (!newConnectionString) {
+                    alert('Пожалуйста, введите строку подключения');
+                    return;
+                }
+
+                // Показываем индикатор загрузки
+                applySettingsBtn.disabled = true;
+                applySettingsBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Применение...';
+
+                try {
+                    const response = await fetch('/Home/UpdateConnectionString', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            connectionString: newConnectionString
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        alert('Настройки успешно применены!');
+
+                        // Закрываем модальное окно
+                        const modal = bootstrap.Modal.getInstance(settingsModal);
+                        modal.hide();
+                    } else {
+                        alert('Ошибка: ' + result.message);
+                    }
+                } catch (error) {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при сохранении настроек');
+                } finally {
+                    // Восстанавливаем кнопку
+                    applySettingsBtn.disabled = false;
+                    applySettingsBtn.textContent = 'Применить';
+                }
+            });
+
+            // Обработчик для кнопки "Отмена"
+            settingsModal.querySelector('.btn-secondary').addEventListener('click', function() {
+                // Восстанавливаем оригинальное значение при отмене
+                loadCurrentConnectionString();
+            });
+
+            // Функция для загрузки текущей строки подключения
+            async function loadCurrentConnectionString() {
+                try {
+                    const response = await fetch('/Home/GetConnectionString');
+                    if (response.ok) {
+                        const data = await response.json();
+                        connectionStringInput.value = data.connectionString || '';
+                    }
+                } catch (error) {
+                    console.error('Ошибка при загрузке строки подключения:', error);
+                }
+            }
+
+            // Дополнительно: кнопка для тестирования подключения
+            const testConnectionBtn = document.createElement('button');
+            testConnectionBtn.type = 'button';
+            testConnectionBtn.className = 'btn btn-info me-2';
+            testConnectionBtn.textContent = 'Тестировать';
+            testConnectionBtn.onclick = testConnection;
+
+            // Добавляем кнопку тестирования в модальное окно
+            applySettingsBtn.parentNode.insertBefore(testConnectionBtn, applySettingsBtn);
+
+            async function testConnection() {
+                const testConnectionString = connectionStringInput.value.trim();
+
+                if (!testConnectionString) {
+                    alert('Пожалуйста, введите строку подключения для тестирования');
+                    return;
+                }
+
+                testConnectionBtn.disabled = true;
+                testConnectionBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Тестирование...';
+
+                try {
+                    const response = await fetch('/Home/TestConnection', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            connectionString: testConnectionString
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        alert('✅ Подключение успешно! ' + result.message);
+                    } else {
+                        alert('❌ Ошибка подключения: ' + result.message);
+                    }
+                } catch (error) {
+                    alert('❌ Ошибка сети: ' + error.message);
+                } finally {
+                    testConnectionBtn.disabled = false;
+                    testConnectionBtn.textContent = 'Тестировать';
+                }
+            }
+        });
+    </script>
+}

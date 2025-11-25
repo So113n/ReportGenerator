@@ -1,0 +1,143 @@
+﻿@using ReportGenerator.Utils
+@model ReportGenerator.Utils.Vector<string>
+
+@{
+    ViewData["Title"] = "Vector Demo";
+}
+
+<h1 class="mb-4">@ViewData["Title"]</h1>
+
+<div class="row">
+    <div class="col-md-6">
+        <!-- Форма добавления -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Добавить элемент</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" asp-action="AddToVector">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="item" placeholder="Введите элемент" required>
+                        <button type="submit" class="btn btn-primary">Добавить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Управление -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Управление вектором</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <form method="post" asp-action="ClearVector" class="d-inline">
+                        <button type="submit" class="btn btn-danger w-100 mb-2"
+                        @(Model.Count == 0 ? "disabled" : "")>
+                            <i class="bi bi-trash"></i> Очистить вектор
+                        </button>
+                    </form>
+
+                    <a href="@Url.Action("VectorView")" class="btn btn-secondary w-100">
+                        <i class="bi bi-arrow-clockwise"></i> Обновить
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Информация -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Информация о векторе</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Количество элементов:</strong> @Model.Count</p>
+                <p><strong>Емкость:</strong> @Model.Capacity</p>
+                <p><strong>Пуст:</strong> @(Model.Count == 0 ? "Да" : "Нет")</p>
+
+                @if (Model.Count > 0)
+                {
+                    <p><strong>Первый элемент:</strong> @Model.Front()</p>
+                    <p><strong>Последний элемент:</strong> @Model.Back()</p>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <!-- Элементы вектора -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Элементы вектора (@Model.Count)</h5>
+            </div>
+            <div class="card-body p-0">
+                @if (Model.Count == 0)
+                {
+                    <div class="text-center p-4">
+                        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                        <p class="text-muted mt-2">Вектор пуст</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="list-group list-group-flush">
+                        @for (int i = 0; i < Model.Count; i++)
+                        {
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="badge bg-secondary me-2">@i</span>
+                                    <span>@Model[i]</span>
+                                </div>
+                                <form method="post" asp-action="RemoveFromVector">
+                                    <input type="hidden" name="index" value="@i">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-x"></i> Удалить
+                                    </button>
+                                </form>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Дополнительные операции -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Дополнительные операции</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-2">
+                        <form method="post" asp-action="AddToVector">
+                            <input type="hidden" name="item" value="Пример 1">
+                            <button type="submit" class="btn btn-outline-primary w-100">
+                                Добавить "Пример 1"
+                            </button>
+                        </form>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <form method="post" asp-action="AddToVector">
+                            <input type="hidden" name="item" value="Пример 2">
+                            <button type="submit" class="btn btn-outline-primary w-100">
+                                Добавить "Пример 2"
+                            </button>
+                        </form>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <form method="post" asp-action="AddToVector">
+                            <input type="hidden" name="item" value="Пример 3">
+                            <button type="submit" class="btn btn-outline-primary w-100">
+                                Добавить "Пример 3"
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,99 @@
+﻿@* Views/Home/Monitoring.cshtml *@
+@{
+    ViewData["Title"] = "Мониторинг производительности";
+}
+
+<div class="container">
+    <h1>@ViewData["Title"]</h1>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Текущие метрики</div>
+                <div class="card-body" id="currentMetrics">
+                    Загрузка...
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Активные уведомления</div>
+                <div class="card-body" id="alertsContainer">
+                    Загрузка...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        async function loadMetrics() {
+            try {
+                const response = await fetch('/api/monitoring/current');
+                const metrics = await response.json();
+                
+                document.getElementById('currentMetrics').innerHTML = `
+                    <p>CPU: ${metrics.cpuUsagePercent}%</p>
+                    <p>Память: ${(metrics.memoryUsageBytes / 1024 / 1024).toFixed(2)} MB</p>
+                    <p>Запросов: ${metrics.activeRequests}</p>
+                    <p>Исключений: ${metrics.exceptionCount}</p>
+                `;
+            } catch (error) {
+                console.error('Ошибка загрузки метрик:', error);
+            }
+        }
+        
+        async function loadAlerts() {
+            try {
+                const response = await fetch('/api/monitoring/alerts');
+                const alerts = await response.json();
+                
+                if (alerts.length === 0) {
+                    document.getElementById('alertsContainer').innerHTML = 
+                        '<div class="text-success">Нет активных уведомлений</div>';
+                    return;
+                }
+                
+                let html = '';
+                alerts.forEach(alert => {
+                    html += `
+                        <div class="alert alert-${getAlertClass(alert.level)}">
+                            <h6>${alert.title}</h6>
+                            <p>${alert.message}</p>
+                            <small>${new Date(alert.timestamp).toLocaleString()}</small>
+                            <button onclick="resolveAlert('${alert.id}')" class="btn btn-sm btn-outline-secondary">
+                                Исправлено
+                            </button>
+                        </div>
+                    `;
+                });
+                
+                document.getElementById('alertsContainer').innerHTML = html;
+            } catch (error) {
+                console.error('Ошибка загрузки уведомлений:', error);
+            }
+        }
+        
+        function getAlertClass(level) {
+            switch (level) {
+                case 'Warning': return 'warning';
+                case 'Error': return 'danger';
+                case 'Critical': return 'dark';
+                default: return 'info';
+            }
+        }
+        
+        async function resolveAlert(id) {
+            await fetch(`/api/monitoring/alerts/${id}/resolve`, { method: 'POST' });
+            loadAlerts();
+        }
+        
+        // Загружаем данные при старте и каждые 30 секунд
+        loadMetrics();
+        loadAlerts();
+        setInterval(loadMetrics, 30000);
+        setInterval(loadAlerts, 30000);
+    </script>
+}

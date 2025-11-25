@@ -1,0 +1,169 @@
+﻿@using ReportGenerator.Utils
+@model ReportGenerator.Utils.List<string>
+
+@{
+    ViewData["Title"] = "List Demo";
+}
+
+<h1 class="mb-4">@ViewData["Title"]</h1>
+
+<div class="row">
+    <div class="col-md-6">
+        <!-- Форма добавления -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Добавить элемент</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" asp-action="AddToList">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="item" placeholder="Введите элемент" required>
+                        <button type="submit" class="btn btn-primary">Добавить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Форма удаления -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Удалить элемент</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" asp-action="RemoveFromList">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="item" placeholder="Введите элемент для удаления" required>
+                        <button type="submit" class="btn btn-danger">Удалить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Управление -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Управление списком</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <form method="post" asp-action="ClearList" class="d-inline">
+                        <button type="submit" class="btn btn-danger w-100 mb-2"
+                        @(Model.Count == 0 ? "disabled" : "")>
+                            <i class="bi bi-trash"></i> Очистить список
+                        </button>
+                    </form>
+
+                    <a href="@Url.Action("ListView")" class="btn btn-secondary w-100">
+                        <i class="bi bi-arrow-clockwise"></i> Обновить
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Информация -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Информация о списке</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Количество элементов:</strong> @Model.Count</p>
+                <p><strong>Пуст:</strong> @(Model.Count == 0 ? "Да" : "Нет")</p>
+
+                @if (Model.Count > 0)
+                {
+                    <p><strong>Первый элемент:</strong> @Model.First()</p>
+                    <p><strong>Последний элемент:</strong> @Model.Last()</p>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <!-- Элементы списка -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Элементы списка (@Model.Count)</h5>
+            </div>
+            <div class="card-body p-0">
+                @if (Model.Count == 0)
+                {
+                    <div class="text-center p-4">
+                        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                        <p class="text-muted mt-2">Список пуст</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="list-group list-group-flush">
+                        @{
+                            int index = 0;
+                            foreach (var item in Model)
+                            {
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="badge bg-secondary me-2">@(index++)</span>
+                                        <span>@item</span>
+                                    </div>
+                                    <form method="post" asp-action="RemoveFromList">
+                                        <input type="hidden" name="item" value="@item">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-x"></i> Удалить
+                                        </button>
+                                    </form>
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Дополнительные операции -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Дополнительные операции</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-2">
+                        <form method="post" asp-action="AddToList">
+                            <input type="hidden" name="item" value="Яблоко">
+                            <button type="submit" class="btn btn-outline-primary w-100">
+                                Добавить "Яблоко"
+                            </button>
+                        </form>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <form method="post" asp-action="AddToList">
+                            <input type="hidden" name="item" value="Банан">
+                            <button type="submit" class="btn btn-outline-primary w-100">
+                                Добавить "Банан"
+                            </button>
+                        </form>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <form method="post" asp-action="AddToList">
+                            <input type="hidden" name="item" value="Апельсин">
+                            <button type="submit" class="btn btn-outline-primary w-100">
+                                Добавить "Апельсин"
+                            </button>
+                        </form>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <form method="post" asp-action="AddToList">
+                            <input type="hidden" name="item" value="Виноград">
+                            <button type="submit" class="btn btn-outline-primary w-100">
+                                Добавить "Виноград"
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+

@@ -1,0 +1,16 @@
+Консоль NuGet: 
+Install-Package MySql.Data
+Install-Package ClosedXML
+Install-Package iTextSharp
+
+Docher: Lonux 
+
+PhPMyAdmin:
+-------------
+SELECT host, user FROM mysql.user;
+-------------
+CREATE USER 'docker_user'@'%' IDENTIFIED BY 'docker_password';
+GRANT ALL PRIVILEGES ON 461_db.* TO 'docker_user'@'%';
+FLUSH PRIVILEGES;
+
+

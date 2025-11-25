@@ -212,8 +212,14 @@ namespace ReportGenerator.Database.DbControllers
                 : reader["applicant"].ToString();
 
             data.Priority = reader["priority"] == DBNull.Value
-                ? 0
-                : Convert.ToInt32(reader["priority"]);
+                ? "Не определено"
+                : Convert.ToInt32(reader["priority"]) switch
+                {
+                    1 => "Низкий",
+                    2 => "Высокий",
+                    3 => "Средний",
+                    _ => "Не определено"
+                };
 
             data.Executor = reader["executor"] == DBNull.Value
                 ? string.Empty

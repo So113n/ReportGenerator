@@ -8,7 +8,7 @@
         public string Service = "";
         public string ShortDescription = "";
         public string Applicant = "";
-        public int Priority;
+        public string Priority { get; set; }
         public string Executor = "";
         public string DecisionTime = "";
         public int Status;

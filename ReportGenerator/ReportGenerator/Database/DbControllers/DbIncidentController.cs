@@ -1,6 +1,9 @@
-﻿using System.Data;
+﻿using DocumentFormat.OpenXml.Drawing.Charts;
 using MySql.Data.MySqlClient;
 using ReportGenerator.Database.DbModels;
+using System.Data;
+using System.Net;
+using System.Text.RegularExpressions;
 
 namespace ReportGenerator.Database.DbControllers
 {
@@ -16,6 +19,21 @@ namespace ReportGenerator.Database.DbControllers
     public class DbIncidentController
     {
         private string _connectionString;
+
+        private static string CleanHtml(string? html)
+        {
+            if (string.IsNullOrEmpty(html))
+                return string.Empty;
+
+            // 1. Превращаем &#60;p&#62; в <p>
+            var decoded = WebUtility.HtmlDecode(html);
+
+            // 2. Срезаем любые HTML-теги
+            var noTags = Regex.Replace(decoded, "<.*?>", string.Empty);
+
+            // 3. Убираем пробелы/переводы строк по краям
+            return noTags.Trim();
+        }
 
         public string ConnectionString
         {
@@ -91,15 +109,24 @@ namespace ReportGenerator.Database.DbControllers
                     tickets.id                           AS id,
                     tickets.id                           AS incident_number,
                     tickets.date_creation                AS registration_time,
-                        ''                                   AS service,
+                    cats.completename                     AS service,
                     tickets.content                      AS short_description,
-                    CONCAT(users.realname, ' ', users.firstname) AS applicant,
+                    CONCAT(req.realname, ' ', req.firstname) AS applicant,
                     tickets.priority                     AS priority,
-                        ''                                   AS executor,
+                    CONCAT(exec.realname, ' ', exec.firstname)  AS executor,
                     tickets.solvedate                    AS decision_time,
-                    tickets.status                       AS status
+                    (
+                        SELECT tt.content
+                        FROM glpi_tickettasks AS tt
+                        WHERE tt.tickets_id = tickets.id
+                        ORDER BY tt.date DESC
+                        LIMIT 1
+                    )                                    AS status
                 FROM glpi_tickets AS tickets
-                LEFT JOIN glpi_users AS users ON tickets.users_id_recipient = users.id
+                LEFT JOIN glpi_users AS req ON tickets.users_id_recipient = req.id
+                LEFT JOIN glpi_users AS exec ON tickets.users_id_lastupdater = exec.id
+                LEFT JOIN glpi_itilcategories AS cats ON tickets.itilcategories_id = cats.id
+               
                 WHERE DATE(tickets.date_creation) BETWEEN @startDate AND @endDate";
 
                     await using (var command = new MySqlCommand(query, connection))
@@ -159,16 +186,24 @@ namespace ReportGenerator.Database.DbControllers
                 tickets.id                           AS id,
                 tickets.id                           AS incident_number,
                 tickets.date_creation                AS registration_time,
-                 ''                                   AS service,
+                cats.completename                     AS service,
                 tickets.content                      AS short_description,
-                CONCAT(users.realname, ' ', users.firstname) AS applicant,
+                CONCAT(req.realname, ' ', req.firstname) AS applicant,
                 tickets.priority                     AS priority,
-                 ''                                   AS executor,
+                CONCAT(exec.realname, ' ', exec.firstname)  AS executor,
                 tickets.solvedate                    AS decision_time,
-                tickets.status                       AS status
+                (
+                    SELECT tt.content
+                    FROM glpi_tickettasks AS tt
+                    WHERE tt.tickets_id = tickets.id
+                    ORDER BY tt.date DESC
+                    LIMIT 1
+                )                                    AS status
             FROM glpi_tickets AS tickets
-            LEFT JOIN glpi_users AS users ON tickets.users_id_recipient = users.id";
-
+            LEFT JOIN glpi_users AS req ON tickets.users_id_recipient = req.id
+            LEFT JOIN glpi_users AS exec ON tickets.users_id_lastupdater = exec.id
+            LEFT JOIN glpi_itilcategories AS cats ON tickets.itilcategories_id = cats.id";
+            
             return period switch
             {
                 ReportPeriod.OneDay =>
@@ -197,23 +232,32 @@ namespace ReportGenerator.Database.DbControllers
 
             data.RegistrationTime = reader["registration_time"] == DBNull.Value
                 ? string.Empty
-                : reader["registration_time"].ToString();
+                : Convert.ToDateTime(reader["registration_time"])
+                    .ToString("dd/MM/yyyy HH:mm:ss");
 
             data.Service = reader["service"] == DBNull.Value
                 ? string.Empty
                 : reader["service"].ToString();
 
-            data.ShortDescription = reader["short_description"] == DBNull.Value
+            var rawDescription = reader["short_description"] == DBNull.Value
                 ? string.Empty
                 : reader["short_description"].ToString();
+
+            data.ShortDescription = CleanHtml(rawDescription);
 
             data.Applicant = reader["applicant"] == DBNull.Value
                 ? string.Empty
                 : reader["applicant"].ToString();
 
             data.Priority = reader["priority"] == DBNull.Value
-                ? 0
-                : Convert.ToInt32(reader["priority"]);
+                ? "Не определено"
+                : Convert.ToInt32(reader["priority"]) switch
+                {
+                    1 => "Низкий",
+                    2 => "Высокий",
+                    3 => "Средний",
+                    _ => "Не определено"
+                };
 
             data.Executor = reader["executor"] == DBNull.Value
                 ? string.Empty
@@ -221,13 +265,15 @@ namespace ReportGenerator.Database.DbControllers
 
             data.DecisionTime = reader["decision_time"] == DBNull.Value
                 ? string.Empty
-                : reader["decision_time"].ToString();
+                : Convert.ToDateTime(reader["decision_time"])
+                    .ToString("dd/MM/yyyy HH:mm:ss");
 
-            data.Status = reader["status"] == DBNull.Value
-                ? 0
-                : Convert.ToInt32(reader["status"]);
+            var rawStatus = reader["status"] == DBNull.Value
+                ? string.Empty
+                : reader["status"].ToString();
 
-     
+            data.Status = CleanHtml(rawStatus);
+
             data.Content = data.ShortDescription;
             data.RealName = string.Empty;
             data.FirstName = string.Empty;

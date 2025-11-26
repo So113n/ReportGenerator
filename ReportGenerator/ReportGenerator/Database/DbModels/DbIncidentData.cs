@@ -11,7 +11,7 @@
         public string Priority { get; set; }
         public string Executor = "";
         public string DecisionTime = "";
-        public int Status;
+        public string Status = "";
         public string Content { get; set; } // Описание инцидента
         public string RealName { get; set; } // Фамилия заявителя
         public string FirstName { get; set; } // Имя заявителя

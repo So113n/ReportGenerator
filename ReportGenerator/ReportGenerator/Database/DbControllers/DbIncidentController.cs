@@ -232,7 +232,8 @@ namespace ReportGenerator.Database.DbControllers
 
             data.RegistrationTime = reader["registration_time"] == DBNull.Value
                 ? string.Empty
-                : reader["registration_time"].ToString();
+                : Convert.ToDateTime(reader["registration_time"])
+                    .ToString("dd/MM/yyyy HH:mm:ss");
 
             data.Service = reader["service"] == DBNull.Value
                 ? string.Empty
@@ -264,7 +265,8 @@ namespace ReportGenerator.Database.DbControllers
 
             data.DecisionTime = reader["decision_time"] == DBNull.Value
                 ? string.Empty
-                : reader["decision_time"].ToString();
+                : Convert.ToDateTime(reader["decision_time"])
+                    .ToString("dd/MM/yyyy HH:mm:ss");
 
             var rawStatus = reader["status"] == DBNull.Value
                 ? string.Empty

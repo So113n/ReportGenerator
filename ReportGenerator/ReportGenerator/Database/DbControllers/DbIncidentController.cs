@@ -109,11 +109,11 @@ namespace ReportGenerator.Database.DbControllers
                     tickets.id                           AS id,
                     tickets.id                           AS incident_number,
                     tickets.date_creation                AS registration_time,
-                        ''                                   AS service,
+                    cats.completename                     AS service,
                     tickets.content                      AS short_description,
-                    CONCAT(users.realname, ' ', users.firstname) AS applicant,
+                    CONCAT(req.realname, ' ', req.firstname) AS applicant,
                     tickets.priority                     AS priority,
-                        ''                                   AS executor,
+                    CONCAT(exec.realname, ' ', exec.firstname)  AS executor,
                     tickets.solvedate                    AS decision_time,
                     (
                         SELECT tt.content
@@ -123,7 +123,10 @@ namespace ReportGenerator.Database.DbControllers
                         LIMIT 1
                     )                                    AS status
                 FROM glpi_tickets AS tickets
-                LEFT JOIN glpi_users AS users ON tickets.users_id_recipient = users.id
+                LEFT JOIN glpi_users AS req ON tickets.users_id_recipient = req.id
+                LEFT JOIN glpi_users AS exec ON tickets.users_id_lastupdater = exec.id
+                LEFT JOIN glpi_itilcategories AS cats ON tickets.itilcategories_id = cats.id
+               
                 WHERE DATE(tickets.date_creation) BETWEEN @startDate AND @endDate";
 
                     await using (var command = new MySqlCommand(query, connection))
@@ -183,11 +186,11 @@ namespace ReportGenerator.Database.DbControllers
                 tickets.id                           AS id,
                 tickets.id                           AS incident_number,
                 tickets.date_creation                AS registration_time,
-                ''                                   AS service,
+                cats.completename                     AS service,
                 tickets.content                      AS short_description,
-                CONCAT(users.realname, ' ', users.firstname) AS applicant,
+                CONCAT(req.realname, ' ', req.firstname) AS applicant,
                 tickets.priority                     AS priority,
-                ''                                   AS executor,
+                CONCAT(exec.realname, ' ', exec.firstname)  AS executor,
                 tickets.solvedate                    AS decision_time,
                 (
                     SELECT tt.content
@@ -197,8 +200,10 @@ namespace ReportGenerator.Database.DbControllers
                     LIMIT 1
                 )                                    AS status
             FROM glpi_tickets AS tickets
-            LEFT JOIN glpi_users AS users ON tickets.users_id_recipient = users.id";
-
+            LEFT JOIN glpi_users AS req ON tickets.users_id_recipient = req.id
+            LEFT JOIN glpi_users AS exec ON tickets.users_id_lastupdater = exec.id
+            LEFT JOIN glpi_itilcategories AS cats ON tickets.itilcategories_id = cats.id";
+            
             return period switch
             {
                 ReportPeriod.OneDay =>

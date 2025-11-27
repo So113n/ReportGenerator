@@ -52,7 +52,7 @@ namespace ReportGenerator.Services
                         worksheet.Cell(7, i + 1).Style.Font.Bold = true;
                         worksheet.Cell(7, i + 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                     }
-
+                                 
                     // Заполняем данные в таблице начиная с 8 строки
                     int currentRow = 8;
                  
@@ -60,7 +60,7 @@ namespace ReportGenerator.Services
                     {
                         // Проверка, если строк больше чем в шаблоне - вставляем новые строки
                         if (currentRow > 15)
-                        {
+                    {
                             worksheet.Row(15).InsertRowsBelow(1); // Вставляем новую строку
                             worksheet.Row(currentRow).Style = worksheet.Row(15).Style;  // Копируем стиль
                         }
@@ -88,7 +88,7 @@ namespace ReportGenerator.Services
 
                     // Автоподбор ширины столбцов
                     worksheet.Columns(1, 9).AdjustToContents();
-
+                    
                     worksheet.Cell(currentRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                     worksheet.Cell(currentRow, 2).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                     worksheet.Cell(currentRow, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;

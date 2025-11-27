@@ -25,6 +25,13 @@ namespace ReportGenerator.Controllers
             return Ok(metrics);
         }
 
+        [HttpGet("metrics/debug")]
+        public IActionResult GetDebug()
+        {         
+            var m = _monitorService.GetCurrentMetrics();
+            return Ok($"CPU {m.CpuUsagePercent}%, Memory {m.MemoryUsageBytes / (1024 * 1024)} MB, Time {DateTime.UtcNow}");
+        }
+   
         [HttpGet("metrics/current")]
         public IActionResult GetCurrentMetrics()
         {

@@ -30,10 +30,14 @@ namespace ReportGenerator.Services
                 {
                     var worksheet = workbook.Worksheet(1);  // Открываем первый лист
 
+                    int total = incidents.Count;
+                    int closed = incidents.Count(i => !string.IsNullOrEmpty(i.Status));
+                    int inProgress = total - closed;
+
                     // Устанавливаем значения шапки и других текстов
                     worksheet.Cell("A1").Value = "Отчет об инцидентах за " + DateTime.Now.ToString("dd/MM/yyyy");
                     worksheet.Cell("A3").Value = $"Дата и время формирования: {DateTime.Now:dd.MM.yyyy HH:mm:ss}; Отдел ОПП г. Новый Уренгой";
-                    worksheet.Cell("A5").Value = $"Всего инцидентов: «{incidents.Count}», Закрыто: «{incidents.Count(x => x.Status == "Закрыт")}», На исполнении: «{incidents.Count(x => x.Status != "Закрыт")}»";
+                    worksheet.Cell("A5").Value = $"Всего инцидентов: «{total}», Закрыто: «{closed}», На исполнении: «{inProgress}»";
 
                     var headers = new[]
                     {

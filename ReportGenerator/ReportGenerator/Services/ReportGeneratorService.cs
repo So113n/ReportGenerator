@@ -1,7 +1,13 @@
 ﻿using ClosedXML.Excel;
+using Google.Protobuf.WellKnownTypes;
 using iTextSharp.text;
 using iTextSharp.text.pdf;
+using Microsoft.AspNetCore.Routing.Template;
 using ReportGenerator.Database.DbModels;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace ReportGenerator.Services
 {
@@ -13,53 +19,81 @@ namespace ReportGenerator.Services
 
     public class ReportGeneratorService
     {
+        private const string TemplatePath = "/app/Templates/template.xlsx";
+
         public async Task<byte[]> GenerateExcelReportAsync(List<DbIncidentData> incidents)
         {
             return await Task.Run(() =>
             {
-                using (var workbook = new XLWorkbook())
+                // Открываем шаблон Excel
+                using (var workbook = new XLWorkbook(TemplatePath))
                 {
-                    var worksheet = workbook.Worksheets.Add("Инциденты");
+                    var worksheet = workbook.Worksheet(1);  // Открываем первый лист
 
-                    // Заголовки столбцов
+                    // Устанавливаем значения шапки и других текстов
+                    worksheet.Cell("A1").Value = "Отчет об инцидентах за " + DateTime.Now.ToString("dd/MM/yyyy");
+                    worksheet.Cell("A3").Value = $"Дата и время формирования: {DateTime.Now:dd.MM.yyyy HH:mm:ss}; Отдел ОПП г. Новый Уренгой";
+                    worksheet.Cell("A5").Value = $"Всего инцидентов: «{incidents.Count}», Закрыто: «{incidents.Count(x => x.Status == "Закрыт")}», На исполнении: «{incidents.Count(x => x.Status != "Закрыт")}»";
+
                     var headers = new[]
                     {
-                    "Номер инцидента", "Время регистрации", "Услуга",
-                    "Краткое описание", "Заявитель", "Приоритет",
-                    "Исполнитель", "Время решения", "Статус"
-                };
+                        "Номер инцидента", "Время регистрации", "Услуга", "Краткое описание",
+                        "Заявитель", "Приоритет", "Исполнитель", "Время решения", "Статус"
+                    };
 
-                    // Стиль для заголовков
-                    var headerStyle = workbook.Style;
-                    headerStyle.Font.Bold = true;
-                    headerStyle.Fill.BackgroundColor = XLColor.LightGray;
-                    headerStyle.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-
-                    // Добавляем заголовки
+                    // Установка значений заголовков
                     for (int i = 0; i < headers.Length; i++)
                     {
-                        worksheet.Cell(1, i + 1).Value = headers[i];
-                        worksheet.Cell(1, i + 1).Style = headerStyle;
+                        worksheet.Cell(7, i + 1).Value = headers[i]; // Заголовки начинаются с 7 строки
+                        worksheet.Cell(7, i + 1).Style.Font.Bold = true;
+                        worksheet.Cell(7, i + 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                     }
 
-                    // Заполняем данные
-                    int row = 2;
+                    // Заполняем данные в таблице начиная с 8 строки
+                    int currentRow = 8;
+                 
                     foreach (var incident in incidents)
                     {
-                        worksheet.Cell(row, 1).Value = incident.NumerIncident;
-                        worksheet.Cell(row, 2).Value = incident.RegistrationTime;
-                        worksheet.Cell(row, 3).Value = incident.Service;
-                        worksheet.Cell(row, 4).Value = incident.ShortDescription;
-                        worksheet.Cell(row, 5).Value = incident.Applicant;
-                        worksheet.Cell(row, 6).Value = incident.Priority;
-                        worksheet.Cell(row, 7).Value = incident.Executor;
-                        worksheet.Cell(row, 8).Value = incident.DecisionTime;
-                        worksheet.Cell(row, 9).Value = incident.Status;
-                        row++;
+                        // Проверка, если строк больше чем в шаблоне - вставляем новые строки
+                        if (currentRow > 15)
+                        {
+                            worksheet.Row(15).InsertRowsBelow(1); // Вставляем новую строку
+                            worksheet.Row(currentRow).Style = worksheet.Row(15).Style;  // Копируем стиль
+                        }
+
+                        // Заполняем данные
+                        worksheet.Cell(currentRow, 1).Value = incident.NumerIncident;
+                        worksheet.Cell(currentRow, 2).Value = incident.RegistrationTime;
+                        worksheet.Cell(currentRow, 3).Value = incident.Service;
+                        worksheet.Cell(currentRow, 4).Value = incident.ShortDescription;
+                        worksheet.Cell(currentRow, 5).Value = incident.Applicant;
+                        worksheet.Cell(currentRow, 6).Value = incident.Priority;
+                        worksheet.Cell(currentRow, 7).Value = incident.Executor;
+                        worksheet.Cell(currentRow, 8).Value = incident.DecisionTime;
+                        worksheet.Cell(currentRow, 9).Value = incident.Status;
+                        worksheet.Cell(currentRow, 9).Value = incident.Status ?? "—";
+
+                        // Центрируем данные в ячейках
+                        for (int col = 1; col <= 9; col++)
+                        {
+                            worksheet.Cell(currentRow, col).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                        }
+
+                        currentRow++;  // Переходим к следующей строке
                     }
 
                     // Автоподбор ширины столбцов
-                    worksheet.Columns().AdjustToContents();
+                    worksheet.Columns(1, 9).AdjustToContents();
+
+                    worksheet.Cell(currentRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    worksheet.Cell(currentRow, 2).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    worksheet.Cell(currentRow, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    worksheet.Cell(currentRow, 4).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    worksheet.Cell(currentRow, 5).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    worksheet.Cell(currentRow, 6).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    worksheet.Cell(currentRow, 7).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    worksheet.Cell(currentRow, 8).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    worksheet.Cell(currentRow, 9).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
                     // Сохраняем в MemoryStream
                     using (var memoryStream = new MemoryStream())
@@ -80,29 +114,7 @@ namespace ReportGenerator.Services
                     var document = new Document(PageSize.A4.Rotate(), 15f, 15f, 15f, 15f);
                     var writer = PdfWriter.GetInstance(document, memoryStream);
 
-                    // Установка шрифта для Linux
-                    var fontPath = "/usr/share/fonts/truetype/freefont/FreeSans.ttf";
-
-                    // Если шрифт не установлен, используем fallback
-                    BaseFont baseFont;
-                    if (File.Exists(fontPath))
-                    {
-                        baseFont = BaseFont.CreateFont(
-                            fontPath,
-                            BaseFont.IDENTITY_H,
-                            BaseFont.EMBEDDED
-                        );
-                    }
-                    else
-                    {
-                        // Fallback: используем встроенный шрифт с UTF-8 кодировкой
-                        baseFont = BaseFont.CreateFont(
-                            BaseFont.HELVETICA,
-                            BaseFont.CP1250, // Более подходящая кодировка для кириллицы
-                            BaseFont.EMBEDDED
-                        );
-                    }
-
+                    var baseFont = BaseFont.CreateFont(BaseFont.HELVETICA, BaseFont.CP1250, BaseFont.EMBEDDED);
                     var titleFont = new Font(baseFont, 16, Font.BOLD, BaseColor.BLACK);
                     var headerFont = new Font(baseFont, 9, Font.BOLD, BaseColor.WHITE);
                     var dataFont = new Font(baseFont, 8, Font.NORMAL, BaseColor.BLACK);
@@ -118,7 +130,6 @@ namespace ReportGenerator.Services
                     };
                     document.Add(title);
 
-                    // Создаем таблицу
                     var table = new PdfPTable(9)
                     {
                         WidthPercentage = 100,
@@ -128,7 +139,6 @@ namespace ReportGenerator.Services
                         KeepTogether = true
                     };
 
-                    // Настройка ширины колонок
                     table.SetWidths(new float[] { 1f, 1.2f, 1.2f, 1.8f, 1.2f, 0.7f, 1.2f, 1.2f, 0.7f });
 
                     // Добавляем заголовки
@@ -142,7 +152,6 @@ namespace ReportGenerator.Services
                     AddHeaderCell(table, "Время решения", headerFont);
                     AddHeaderCell(table, "Статус", headerFont);
 
-                    // Данные
                     foreach (var incident in incidents)
                     {
                         AddDataCell(table, incident.NumerIncident.ToString(), dataFont, Element.ALIGN_CENTER);
@@ -158,12 +167,11 @@ namespace ReportGenerator.Services
 
                     document.Add(table);
 
-                    // Футер
                     var footer = new Paragraph()
-            {
-                new Chunk($"Всего записей: {incidents.Count} | ", footerFont),
-                new Chunk($"Сгенерирован: {DateTime.Now:dd.MM.yyyy HH:mm}", footerFont)
-            };
+                    {
+                        new Chunk($"Всего записей: {incidents.Count} | ", footerFont),
+                        new Chunk($"Сгенерирован: {DateTime.Now:dd.MM.yyyy HH:mm}", footerFont)
+                    };
                     footer.Alignment = Element.ALIGN_RIGHT;
                     footer.SpacingBefore = 20f;
                     document.Add(footer);
@@ -227,6 +235,5 @@ namespace ReportGenerator.Services
                 _ => throw new ArgumentException("Неизвестный формат отчета. Поддерживаются: excel, pdf")
             };
         }
-
     }
 }

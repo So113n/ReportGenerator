@@ -128,12 +128,7 @@ namespace ReportGenerator.Controllers
                     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
                     fileName = $"incidents_report_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
                 }
-                else if (request.Format.ToLower() == "pdf")
-                {
-                    reportData = await _reportGeneratorService.GeneratePdfReportAsync(incidents);
-                    contentType = "application/pdf";
-                    fileName = $"incidents_report_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
-                }
+   
                 else
                 {
                     return Json(new { success = false, message = "Неизвестный формат отчета" });

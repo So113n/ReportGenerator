@@ -1,7 +1,13 @@
 ﻿using ClosedXML.Excel;
+using Google.Protobuf.WellKnownTypes;
 using iTextSharp.text;
 using iTextSharp.text.pdf;
+using Microsoft.AspNetCore.Routing.Template;
 using ReportGenerator.Database.DbModels;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace ReportGenerator.Services
 {
@@ -13,39 +19,82 @@ namespace ReportGenerator.Services
 
     public class ReportGeneratorService
     {
+        private const string TemplatePath = "/app/Templates/template.xlsx";
         public async Task<byte[]> GenerateExcelReportAsync(List<DbIncidentData> incidents)
         {
             return await Task.Run(() =>
             {
-                using (var workbook = new XLWorkbook())
+                using (var workbook = new XLWorkbook(TemplatePath))
                 {
-                    var worksheet = workbook.Worksheets.Add("Инциденты");
+                    var worksheet = workbook.Worksheet(1); // первый лист шаблона
 
-                    // Заголовки столбцов
-                    var headers = new[]
+                    // --- Подсчёт статистики по статусу ---
+                    int total = incidents.Count;
+                    int closed = incidents.Count(i => !string.IsNullOrWhiteSpace(i.Status));
+                    int inProgress = total - closed;
+
+                    // Выбираем часовой пояс (UTC+5, Екатеринбург)
+                    var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Yekaterinburg");
+                    // Берём текущее UTC-время и конвертируем в локальное
+                    var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+
+                    // --- Шапка отчёта ---
+                    worksheet.Cell("A1").Value =
+                        $"Отчет об инцидентах за {now:dd.MM.yyyy}";
+                    worksheet.Cell("A3").Value =
+                        $"Дата и время формирования: {now:dd.MM.yyyy HH:mm:ss}; Отдел ОПП г. Новый Уренгой";
+                    worksheet.Cell("A5").Value =
+                        $"Всего инцидентов: «{total}», Закрыто: «{closed}», На исполнении: «{inProgress}»";
+
+                    // --- Разметка таблицы в шаблоне ---
+                    const int headerRow = 7;            // строка заголовков таблицы
+                    const int firstDataRow = 8;         // первая строка с данными
+                    const int lastTemplateDataRow = 15; // последняя строка таблицы в шаблоне
+                    const int dataColumnCount = 9;      // от "№ инцидента" до "Статус"
+
+                    // В шаблоне уже есть несколько строк под данные
+                    int templateCapacity = lastTemplateDataRow - firstDataRow + 1; // 8 строк
+
+                    // Сколько строк реально нужно под данные
+                    int rowsNeeded = Math.Max(total, 1); // хотя бы одна строка оставим
+
+                    // --- Подгоняем количество строк под наши данные ---
+
+                    if (rowsNeeded > templateCapacity)
                     {
-                    "Номер инцидента", "Время регистрации", "Услуга",
-                    "Краткое описание", "Заявитель", "Приоритет",
-                    "Исполнитель", "Время решения", "Статус"
-                };
+                        // Случай "за весь период" или когда данных много:
+                        // добавляем недостающие строки, как у тебя было.
+                        int extraRows = rowsNeeded - templateCapacity;
 
-                    // Стиль для заголовков
-                    var headerStyle = workbook.Style;
-                    headerStyle.Font.Bold = true;
-                    headerStyle.Fill.BackgroundColor = XLColor.LightGray;
-                    headerStyle.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-
-                    // Добавляем заголовки
-                    for (int i = 0; i < headers.Length; i++)
+                        var lastTemplateRow = worksheet.Row(lastTemplateDataRow);
+                        lastTemplateRow.InsertRowsBelow(extraRows);
+                    }
+                    else if (rowsNeeded < templateCapacity)
                     {
-                        worksheet.Cell(1, i + 1).Value = headers[i];
-                        worksheet.Cell(1, i + 1).Style = headerStyle;
+                        // Случай "1 месяц", "3 месяца", когда данных меньше шаблонных строк:
+                        // удаляем лишние нижние строки, чтобы не было пустых строк таблицы.
+
+                        int rowsToDelete = templateCapacity - rowsNeeded;
+                        int deleteFrom = firstDataRow + rowsNeeded;   // первая лишняя строка
+                        int deleteTo = lastTemplateDataRow;         // последняя шаблонная строка
+
+                        worksheet.Rows(deleteFrom, deleteTo).Delete();
+                        // Блок с "Составил / Проверил" просто поднимется выше.
                     }
 
-                    // Заполняем данные
-                    int row = 2;
-                    foreach (var incident in incidents)
+                    // После вставок/удалений индекс последней строки с данными:
+                    int lastDataRow = firstDataRow + rowsNeeded - 1;
+
+                    // --- Очищаем только значения в диапазоне данных (стили и границы не трогаем) ---
+                    worksheet.Range(firstDataRow, 1, lastDataRow, dataColumnCount)
+                             .Clear(XLClearOptions.Contents);
+
+                    // --- Заполняем данные ---
+                    for (int i = 0; i < total; i++)
                     {
+                        var incident = incidents[i];
+                        int row = firstDataRow + i;
+
                         worksheet.Cell(row, 1).Value = incident.NumerIncident;
                         worksheet.Cell(row, 2).Value = incident.RegistrationTime;
                         worksheet.Cell(row, 3).Value = incident.Service;
@@ -54,14 +103,19 @@ namespace ReportGenerator.Services
                         worksheet.Cell(row, 6).Value = incident.Priority;
                         worksheet.Cell(row, 7).Value = incident.Executor;
                         worksheet.Cell(row, 8).Value = incident.DecisionTime;
-                        worksheet.Cell(row, 9).Value = incident.Status;
-                        row++;
+                        worksheet.Cell(row, 9).Value =
+                            string.IsNullOrWhiteSpace(incident.Status) ? "—" : incident.Status;
                     }
 
-                    // Автоподбор ширины столбцов
-                    worksheet.Columns().AdjustToContents();
+                    // --- Центрирование и перенос текста в ячейках данных ---
+                    var dataRange = worksheet.Range(firstDataRow, 1, lastDataRow, dataColumnCount);
 
-                    // Сохраняем в MemoryStream
+                    dataRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                    dataRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                    dataRange.Style.Alignment.WrapText = true;
+
+                    // Ширину колонок по-прежнему берём из шаблона (под печать они у тебя уже нормальные).
+
                     using (var memoryStream = new MemoryStream())
                     {
                         workbook.SaveAs(memoryStream);
@@ -70,163 +124,13 @@ namespace ReportGenerator.Services
                 }
             });
         }
-
-        public async Task<byte[]> GeneratePdfReportAsync(List<DbIncidentData> incidents)
-        {
-            return await Task.Run(() =>
-            {
-                using (var memoryStream = new MemoryStream())
-                {
-                    var document = new Document(PageSize.A4.Rotate(), 15f, 15f, 15f, 15f);
-                    var writer = PdfWriter.GetInstance(document, memoryStream);
-
-                    // Установка шрифта для Linux
-                    var fontPath = "/usr/share/fonts/truetype/freefont/FreeSans.ttf";
-
-                    // Если шрифт не установлен, используем fallback
-                    BaseFont baseFont;
-                    if (File.Exists(fontPath))
-                    {
-                        baseFont = BaseFont.CreateFont(
-                            fontPath,
-                            BaseFont.IDENTITY_H,
-                            BaseFont.EMBEDDED
-                        );
-                    }
-                    else
-                    {
-                        // Fallback: используем встроенный шрифт с UTF-8 кодировкой
-                        baseFont = BaseFont.CreateFont(
-                            BaseFont.HELVETICA,
-                            BaseFont.CP1250, // Более подходящая кодировка для кириллицы
-                            BaseFont.EMBEDDED
-                        );
-                    }
-
-                    var titleFont = new Font(baseFont, 16, Font.BOLD, BaseColor.BLACK);
-                    var headerFont = new Font(baseFont, 9, Font.BOLD, BaseColor.WHITE);
-                    var dataFont = new Font(baseFont, 8, Font.NORMAL, BaseColor.BLACK);
-                    var footerFont = new Font(baseFont, 9, Font.ITALIC, BaseColor.GRAY);
-
-                    document.Open();
-
-                    // Заголовок
-                    var title = new Paragraph("ОТЧЕТ ПО ИНЦИДЕНТАМ", titleFont)
-                    {
-                        Alignment = Element.ALIGN_CENTER,
-                        SpacingAfter = 25f
-                    };
-                    document.Add(title);
-
-                    // Создаем таблицу
-                    var table = new PdfPTable(9)
-                    {
-                        WidthPercentage = 100,
-                        SpacingBefore = 15f,
-                        SpacingAfter = 20f,
-                        HeaderRows = 1,
-                        KeepTogether = true
-                    };
-
-                    // Настройка ширины колонок
-                    table.SetWidths(new float[] { 1f, 1.2f, 1.2f, 1.8f, 1.2f, 0.7f, 1.2f, 1.2f, 0.7f });
-
-                    // Добавляем заголовки
-                    AddHeaderCell(table, "Номер инцидента", headerFont);
-                    AddHeaderCell(table, "Время регистрации", headerFont);
-                    AddHeaderCell(table, "Услуга", headerFont);
-                    AddHeaderCell(table, "Краткое описание", headerFont);
-                    AddHeaderCell(table, "Заявитель", headerFont);
-                    AddHeaderCell(table, "Приоритет", headerFont);
-                    AddHeaderCell(table, "Исполнитель", headerFont);
-                    AddHeaderCell(table, "Время решения", headerFont);
-                    AddHeaderCell(table, "Статус", headerFont);
-
-                    // Данные
-                    foreach (var incident in incidents)
-                    {
-                        AddDataCell(table, incident.NumerIncident.ToString(), dataFont, Element.ALIGN_CENTER);
-                        AddDataCell(table, incident.RegistrationTime, dataFont, Element.ALIGN_LEFT);
-                        AddDataCell(table, incident.Service, dataFont, Element.ALIGN_LEFT);
-                        AddDataCell(table, incident.ShortDescription, dataFont, Element.ALIGN_LEFT);
-                        AddDataCell(table, incident.Applicant, dataFont, Element.ALIGN_LEFT);
-                        AddDataCell(table, incident.Priority.ToString(), dataFont, Element.ALIGN_CENTER);
-                        AddDataCell(table, incident.Executor, dataFont, Element.ALIGN_LEFT);
-                        AddDataCell(table, incident.DecisionTime, dataFont, Element.ALIGN_LEFT);
-                        AddDataCell(table, incident.Status.ToString(), dataFont, Element.ALIGN_CENTER);
-                    }
-
-                    document.Add(table);
-
-                    // Футер
-                    var footer = new Paragraph()
-            {
-                new Chunk($"Всего записей: {incidents.Count} | ", footerFont),
-                new Chunk($"Сгенерирован: {DateTime.Now:dd.MM.yyyy HH:mm}", footerFont)
-            };
-                    footer.Alignment = Element.ALIGN_RIGHT;
-                    footer.SpacingBefore = 20f;
-                    document.Add(footer);
-
-                    document.Close();
-                    return memoryStream.ToArray();
-                }
-            });
-        }
-
-        private void AddHeaderCell(PdfPTable table, string text, Font font)
-        {
-            var cell = new PdfPCell(new Phrase(text, font))
-            {
-                HorizontalAlignment = Element.ALIGN_CENTER,
-                VerticalAlignment = Element.ALIGN_MIDDLE,
-                BackgroundColor = new BaseColor(79, 129, 189),
-                Padding = 8f,
-                BorderWidth = 0.5f,
-                BorderColor = BaseColor.GRAY
-            };
-            table.AddCell(cell);
-        }
-
-        private void AddDataCell(PdfPTable table, string text, Font font, int alignment)
-        {
-            var value = string.IsNullOrEmpty(text) || text == "-" ? "—" : text;
-            var cell = new PdfPCell(new Phrase(value, font))
-            {
-                HorizontalAlignment = alignment,
-                VerticalAlignment = Element.ALIGN_MIDDLE,
-                Padding = 6f,
-                BorderWidth = 0.25f,
-                BorderColor = new BaseColor(220, 220, 220)
-            };
-
-            if (table.Rows.Count % 2 == 1)
-            {
-                cell.BackgroundColor = new BaseColor(248, 248, 248);
-            }
-
-            table.AddCell(cell);
-        }
-
-        public async Task<byte[]> GenerateReportAsync(List<DbIncidentData> incidents, string format)
-        {
-            return format.ToLower() switch
-            {
-                "excel" => await GenerateExcelReportAsync(incidents),
-                "pdf" => await GeneratePdfReportAsync(incidents),
-                _ => throw new ArgumentException("Неизвестный формат отчета. Поддерживаются: excel, pdf")
-            };
-        }
-
-        public async Task<byte[]> GenerateReportAsync(List<DbIncidentData> incidents, ReportFormat format)
-        {
-            return format switch
-            {
-                ReportFormat.Excel => await GenerateExcelReportAsync(incidents),
-                ReportFormat.Pdf => await GeneratePdfReportAsync(incidents),
-                _ => throw new ArgumentException("Неизвестный формат отчета. Поддерживаются: excel, pdf")
-            };
-        }
-
     }
 }
+
+
+
+
+
+
+
+

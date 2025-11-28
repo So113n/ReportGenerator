@@ -31,17 +31,24 @@
     <script>
         async function loadMetrics() {
             try {
-                const response = await fetch('/api/monitoring/current');
+                const response = await fetch('/api/monitoring/metrics/current', { cache: 'no-cache' });
+
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+
                 const metrics = await response.json();
                 
                 document.getElementById('currentMetrics').innerHTML = `
-                    <p>CPU: ${metrics.cpuUsagePercent}%</p>
+                    <p>CPU: ${metrics.cpuUsagePercent?.toFixed ? metrics.cpuUsagePercent.toFixed(2) : metrics.cpuUsagePercent || 0}%</p>
                     <p>Память: ${(metrics.memoryUsageBytes / 1024 / 1024).toFixed(2)} MB</p>
-                    <p>Запросов: ${metrics.activeRequests}</p>
-                    <p>Исключений: ${metrics.exceptionCount}</p>
+                    <p>Запросов: ${metrics.activeRequests ?? 0}</p>
+                    <p>Исключения: ${metrics.exceptionCount ?? 0}</p>
                 `;
             } catch (error) {
                 console.error('Ошибка загрузки метрик:', error);
+                document.getElementById('currentMetrics').innerHTML =
+                    '<span class="text-danger">Ошибка загрузки метрик</span>';
             }
         }
         
@@ -93,7 +100,7 @@
         // Загружаем данные при старте и каждые 30 секунд
         loadMetrics();
         loadAlerts();
-        setInterval(loadMetrics, 30000);
+        setInterval(loadMetrics, 2000);
         setInterval(loadAlerts, 30000);
     </script>
 }

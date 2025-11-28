@@ -3,18 +3,20 @@ using System.Diagnostics;
 
 namespace ReportGenerator.Services
 {
-    public class PerformanceMonitorService : IHostedService, IDisposable
+    public class PerformanceMonitorService : BackgroundService
     {
         private readonly ILogger<PerformanceMonitorService> _logger;
         private readonly NotificationService _notificationService;
         private readonly NotificationConfig _config;
 
-        private Timer? _timer;
         private readonly List<PerformanceMetrics> _metricsHistory = new();
+        private readonly object _lock = new();
+
         private int _requestCounter;
         private int _exceptionCounter;
         private DateTime _lastResetTime = DateTime.UtcNow;
-        private readonly object _lock = new();
+
+        private readonly TimeSpan _interval = TimeSpan.FromSeconds(30);
 
         public PerformanceMonitorService(ILogger<PerformanceMonitorService> logger,
                                        NotificationService notificationService,
@@ -25,63 +27,63 @@ namespace ReportGenerator.Services
             _config = config;
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Сервис мониторинга производительности запущен");
+            _logger.LogInformation("Background performance monitor started.");
 
-            _timer = new Timer(CollectMetrics, null, TimeSpan.Zero, TimeSpan.FromSeconds(30));
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    CollectMetrics(null);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Ошибка при сборе метрик");
+                }
 
-            return Task.CompletedTask;
-        }
+                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+            }
 
-        public Task StopAsync(CancellationToken cancellationToken)
-        {
-            _timer?.Dispose();
-            _logger.LogInformation("Сервис мониторинга производительности остановлен");
-
-            return Task.CompletedTask;
+            _logger.LogInformation("Background performance monitor stopping.");
         }
 
         private void CollectMetrics(object? state)
         {
-            try
+            _logger.LogInformation("CollectMetrics triggered at {time}", DateTime.UtcNow);
+
+            var metrics = new PerformanceMetrics
             {
-                var metrics = new PerformanceMetrics
+                CpuUsagePercent = GetCpuUsage(),
+                MemoryUsageBytes = Process.GetCurrentProcess().WorkingSet64,
+                MemoryAvailableBytes = GC.GetTotalMemory(false),
+                ActiveRequests = _requestCounter,
+                ExceptionCount = _exceptionCounter,
+                DatabaseQueryCount = 0, // Будет обновляться из DbContext
+                DatabaseQueryTimeMs = 0 // Будет обновляться из DbContext
+            };
+
+            lock (_lock)
+            {
+                _metricsHistory.Add(metrics);
+
+                // Храним только последние 100 записей
+                if (_metricsHistory.Count > 100)
                 {
-                    CpuUsagePercent = GetCpuUsage(),
-                    MemoryUsageBytes = Process.GetCurrentProcess().WorkingSet64,
-                    MemoryAvailableBytes = GC.GetTotalMemory(false),
-                    ActiveRequests = _requestCounter,
-                    ExceptionCount = _exceptionCounter,
-                    DatabaseQueryCount = 0, // Будет обновляться из DbContext
-                    DatabaseQueryTimeMs = 0 // Будет обновляться из DbContext
-                };
-
-                lock (_lock)
-                {
-                    _metricsHistory.Add(metrics);
-
-                    // Храним только последние 100 записей
-                    if (_metricsHistory.Count > 100)
-                    {
-                        _metricsHistory.RemoveAt(0);
-                    }
-                }
-
-                CheckThresholds(metrics);
-
-                // Сбрасываем счетчики каждую минуту
-                if ((DateTime.UtcNow - _lastResetTime).TotalMinutes >= 1)
-                {
-                    Interlocked.Exchange(ref _requestCounter, 0);
-                    Interlocked.Exchange(ref _exceptionCounter, 0);
-                    _lastResetTime = DateTime.UtcNow;
+                    _metricsHistory.RemoveAt(0);
                 }
             }
-            catch (Exception ex)
+
+            CheckThresholds(metrics);
+
+            // Сбрасываем счетчики каждую минуту
+            if ((DateTime.UtcNow - _lastResetTime).TotalMinutes >= 1)
             {
-                _logger.LogError(ex, "Ошибка при сборе метрик производительности");
+                Interlocked.Exchange(ref _requestCounter, 0);
+                Interlocked.Exchange(ref _exceptionCounter, 0);
+                _lastResetTime = DateTime.UtcNow;
             }
+
         }
 
         private double GetCpuUsage()
@@ -108,6 +110,7 @@ namespace ReportGenerator.Services
                 return 0;
             }
         }
+
 
         public void IncrementRequestCounter() => Interlocked.Increment(ref _requestCounter);
         public void IncrementExceptionCounter() => Interlocked.Increment(ref _exceptionCounter);
@@ -168,9 +171,10 @@ namespace ReportGenerator.Services
 
         public PerformanceMetrics GetCurrentMetrics()
         {
-            return _metricsHistory.LastOrDefault() ?? new PerformanceMetrics();
+            lock (_lock)
+            {
+                return _metricsHistory.Count > 0 ? _metricsHistory[^1] : new PerformanceMetrics();
+            }
         }
-
-        public void Dispose() => _timer?.Dispose();
     }
 }

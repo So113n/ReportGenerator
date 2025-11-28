@@ -10,12 +10,13 @@ namespace ReportGenerator.Controllers
     {
         private readonly PerformanceMonitorService _monitorService;
         private readonly NotificationService _notificationService;
+        private readonly MetricsService _metricsService;
 
-        public MonitoringController(PerformanceMonitorService monitorService,
-                                  NotificationService notificationService)
+        public MonitoringController(PerformanceMonitorService monitorService, NotificationService notificationService, MetricsService metricsService)
         {
             _monitorService = monitorService;
             _notificationService = notificationService;
+            _metricsService = metricsService;
         }  
 
         [HttpGet("metrics")]
@@ -25,10 +26,17 @@ namespace ReportGenerator.Controllers
             return Ok(metrics);
         }
 
+        [HttpGet("metrics/debug")]
+        public IActionResult GetDebug()
+        {         
+            var m = _metricsService.GetCurrentMetrics();
+            return Ok($"CPU {m.CpuUsagePercent}%, Memory {m.MemoryUsageBytes / (1024 * 1024)} MB, Time {DateTime.UtcNow}");
+        }
+   
         [HttpGet("metrics/current")]
         public IActionResult GetCurrentMetrics()
         {
-            var metrics = _monitorService.GetCurrentMetrics();
+            var metrics = _metricsService.GetCurrentMetrics();
             return Ok(metrics);
         }
 
@@ -49,7 +57,7 @@ namespace ReportGenerator.Controllers
         [HttpGet("status")]
         public IActionResult GetStatus()
         {
-            var metrics = _monitorService.GetCurrentMetrics();
+            var metrics = _metricsService.GetCurrentMetrics();
             var alerts = _notificationService.GetAlerts();
 
             return Ok(new

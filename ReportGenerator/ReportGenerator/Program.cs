@@ -1,3 +1,4 @@
+using DocumentFormat.OpenXml.Office2016.Drawing.ChartDrawing;
 using ReportGenerator.Database.DbControllers;
 using ReportGenerator.Models;
 using ReportGenerator.Services;
@@ -25,7 +26,11 @@ namespace ReportGenerator
 
             builder.Services.AddSingleton(config);
             builder.Services.AddSingleton<NotificationService>();
-            builder.Services.AddHostedService<PerformanceMonitorService>();
+            builder.Services.AddSingleton<NotificationConfig>();
+            builder.Services.AddSingleton<PerformanceMonitorService>();
+            builder.Services.AddSingleton<RuntimeMetricsListener>();
+            builder.Services.AddSingleton<MetricsService>();
+
 
             //builder.Services.AddDbContext<ApplicationDbContext>(options =>
             //    options.UseMySQL(builder.Configuration.GetConnectionString("DefaultConnection")));

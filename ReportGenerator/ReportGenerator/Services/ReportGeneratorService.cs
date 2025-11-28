@@ -20,7 +20,6 @@ namespace ReportGenerator.Services
     public class ReportGeneratorService
     {
         private const string TemplatePath = "/app/Templates/template.xlsx";
-
         public async Task<byte[]> GenerateExcelReportAsync(List<DbIncidentData> incidents)
         {
             return await Task.Run(() =>
@@ -35,39 +34,50 @@ namespace ReportGenerator.Services
                     int inProgress = total - closed;
 
                     // --- Шапка отчёта ---
-                    worksheet.Cell("A1").Value = "Отчет об инцидентах за " +
-                                                  DateTime.Now.ToString("dd.MM.yyyy");
+                    worksheet.Cell("A1").Value =
+                        "Отчет об инцидентах за " + DateTime.Now.ToString("dd.MM.yyyy");
                     worksheet.Cell("A3").Value =
                         $"Дата и время формирования: {DateTime.Now:dd.MM.yyyy HH:mm:ss}; Отдел ОПП г. Новый Уренгой";
                     worksheet.Cell("A5").Value =
                         $"Всего инцидентов: «{total}», Закрыто: «{closed}», На исполнении: «{inProgress}»";
 
                     // --- Разметка таблицы в шаблоне ---
-                    const int headerRow = 7;          // строка заголовков таблицы
-                    const int firstDataRow = 8;       // первая строка с данными
+                    const int headerRow = 7;            // строка заголовков таблицы
+                    const int firstDataRow = 8;         // первая строка с данными
                     const int lastTemplateDataRow = 15; // последняя строка таблицы в шаблоне
-                    const int dataColumnCount = 9;    // от "№ инцидента" до "Статус"
+                    const int dataColumnCount = 9;      // от "№ инцидента" до "Статус"
 
                     // В шаблоне уже есть несколько строк под данные
-                    int templateCapacity = lastTemplateDataRow - firstDataRow + 1;
+                    int templateCapacity = lastTemplateDataRow - firstDataRow + 1; // 8 строк
 
                     // Сколько строк реально нужно под данные
                     int rowsNeeded = Math.Max(total, 1); // хотя бы одна строка оставим
 
-                    // --- Если инцидентов больше, чем строк в шаблоне — добавляем строки с тем же стилем ---
+                    // --- Подгоняем количество строк под наши данные ---
+
                     if (rowsNeeded > templateCapacity)
                     {
+                        // Случай "за весь период" или когда данных много:
+                        // добавляем недостающие строки, как у тебя было.
                         int extraRows = rowsNeeded - templateCapacity;
 
-                        // Берём последнюю строку таблицы как образец стиля
                         var lastTemplateRow = worksheet.Row(lastTemplateDataRow);
-
-                        // Вставляем под неё нужное количество строк.
-                        // ClosedXML копирует стиль исходной строки на вставляемые.
                         lastTemplateRow.InsertRowsBelow(extraRows);
                     }
+                    else if (rowsNeeded < templateCapacity)
+                    {
+                        // Случай "1 месяц", "3 месяца", когда данных меньше шаблонных строк:
+                        // удаляем лишние нижние строки, чтобы не было пустых строк таблицы.
 
-                    // Последняя строка, куда будем писать данные
+                        int rowsToDelete = templateCapacity - rowsNeeded;
+                        int deleteFrom = firstDataRow + rowsNeeded;   // первая лишняя строка
+                        int deleteTo = lastTemplateDataRow;         // последняя шаблонная строка
+
+                        worksheet.Rows(deleteFrom, deleteTo).Delete();
+                        // Блок с "Составил / Проверил" просто поднимется выше.
+                    }
+
+                    // После вставок/удалений индекс последней строки с данными:
                     int lastDataRow = firstDataRow + rowsNeeded - 1;
 
                     // --- Очищаем только значения в диапазоне данных (стили и границы не трогаем) ---
@@ -92,16 +102,14 @@ namespace ReportGenerator.Services
                             string.IsNullOrWhiteSpace(incident.Status) ? "—" : incident.Status;
                     }
 
-                    // --- Центрирование и перенос текста в ячейках данных (включая пустые строки) ---
+                    // --- Центрирование и перенос текста в ячейках данных ---
                     var dataRange = worksheet.Range(firstDataRow, 1, lastDataRow, dataColumnCount);
 
                     dataRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                     dataRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
                     dataRange.Style.Alignment.WrapText = true;
 
-                    // ВАЖНО: ширину столбцов не трогаем, она остаётся как в шаблоне.
-                    // Если всё-таки захочешь автоподбор — раскомментируй строку ниже:
-                    // worksheet.Columns(1, dataColumnCount).AdjustToContents();
+                    // Ширину колонок по-прежнему берём из шаблона (под печать они у тебя уже нормальные).
 
                     using (var memoryStream = new MemoryStream())
                     {
@@ -111,9 +119,13 @@ namespace ReportGenerator.Services
                 }
             });
         }
-
-        // ... остальная часть класса (PDF-генерация и т.п.) без изменений ...
     }
 }
+
+
+
+
+
+
 
 

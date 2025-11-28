@@ -33,11 +33,16 @@ namespace ReportGenerator.Services
                     int closed = incidents.Count(i => !string.IsNullOrWhiteSpace(i.Status));
                     int inProgress = total - closed;
 
+                    // Выбираем часовой пояс (UTC+5, Екатеринбург)
+                    var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Yekaterinburg");
+                    // Берём текущее UTC-время и конвертируем в локальное
+                    var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+
                     // --- Шапка отчёта ---
                     worksheet.Cell("A1").Value =
-                        "Отчет об инцидентах за " + DateTime.Now.ToString("dd.MM.yyyy");
+                        $"Отчет об инцидентах за {now:dd.MM.yyyy}";
                     worksheet.Cell("A3").Value =
-                        $"Дата и время формирования: {DateTime.Now:dd.MM.yyyy HH:mm:ss}; Отдел ОПП г. Новый Уренгой";
+                        $"Дата и время формирования: {now:dd.MM.yyyy HH:mm:ss}; Отдел ОПП г. Новый Уренгой";
                     worksheet.Cell("A5").Value =
                         $"Всего инцидентов: «{total}», Закрыто: «{closed}», На исполнении: «{inProgress}»";
 

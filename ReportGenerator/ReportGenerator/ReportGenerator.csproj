@@ -9,14 +9,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="EventLog\EventLogListenerService.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.105.0" />
     <PackageReference Include="iTextSharp" Version="5.5.13.4" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
     <PackageReference Include="MySql.Data" Version="9.4.0" />
+    <PackageReference Include="System.Text.Json" Version="10.0.1" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Fonts\" />
+    <Folder Include="Services\Новая папка1\" />
+    <Folder Include="Services\Новая папка\" />
   </ItemGroup>
 
   <ItemGroup>

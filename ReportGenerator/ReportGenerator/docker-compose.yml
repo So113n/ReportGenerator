@@ -4,7 +4,20 @@ services:
     build: .
     ports:
       - "5000:80"
+      - "8080:8080"
+      - "8081:8081"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - Glpi__BaseUrl=http://host.docker.internal/glpi/apirest.php
+      - Glpi__AppToken=UnGr7V5EKqqu2qel7XUmCu5gqMtVU41kCpVUwx2U
+      - Glpi__UserToken=4G0d02SkzBbZ663EzZGDSLy5ztGQWpmI5D5ewo9u
+      - Glpi__EntityId=0
+      - Glpi__CategoryId=15
+      - Glpi__RecipientUserId=6
+      - Glpi__Priority=3
+      - Glpi__Status=1
+      - LogWatcher__LogFilePath=/app/Scripts/events.log
     extra_hosts:
       - "host.docker.internal:host-gateway"  # Добавляет host.docker.internal
+    volumes:
+      - "./Scripts:/app/Scripts"
+            

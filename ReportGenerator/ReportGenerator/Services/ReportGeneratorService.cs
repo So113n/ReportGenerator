@@ -124,6 +124,120 @@ namespace ReportGenerator.Services
                 }
             });
         }
+        public async Task<byte[]> GeneratePdfReportAsync(List<DbIncidentData> incidents)
+        {
+            return await Task.Run(() =>
+            {
+                // Часовой пояс как в Excel-отчёте
+                var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Yekaterinburg");
+                var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+
+                // Подготовка шрифта с поддержкой кириллицы
+                // Fonts/arial.ttf у тебя копируется в output, поэтому берём из AppContext.BaseDirectory
+                var fontPath = Path.Combine(AppContext.BaseDirectory, "Fonts", "arial.ttf");
+                BaseFont baseFont;
+
+                if (File.Exists(fontPath))
+                {
+                    baseFont = BaseFont.CreateFont(fontPath, BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
+                }
+                else
+                {
+                    // Фолбэк: системный шрифт (на Linux-контейнере обычно есть DejaVu)
+                    // Если и он не подхватится — будет без кириллицы, поэтому лучше держать arial.ttf в output.
+                    baseFont = BaseFont.CreateFont(BaseFont.HELVETICA, BaseFont.CP1252, BaseFont.NOT_EMBEDDED);
+                }
+
+                var titleFont = new Font(baseFont, 14, Font.BOLD);
+                var headerFont = new Font(baseFont, 10, Font.BOLD);
+                var cellFont = new Font(baseFont, 9, Font.NORMAL);
+
+                using var ms = new MemoryStream();
+
+                // Много колонок → альбомная ориентация
+                using var document = new Document(PageSize.A4.Rotate(), 20, 20, 20, 20);
+                var writer = PdfWriter.GetInstance(document, ms);
+                writer.CloseStream = false;
+
+                document.Open();
+
+                // Заголовок
+                document.Add(new Paragraph($"Отчет об инцидентах за {now:dd.MM.yyyy}", titleFont));
+                document.Add(new Paragraph($"Дата и время формирования: {now:dd.MM.yyyy HH:mm:ss}; Отдел ОПП г. Новый Уренгой", cellFont));
+                document.Add(new Paragraph(" ", cellFont));
+
+                // Статистика (как в Excel)
+                int total = incidents.Count;
+                int closed = incidents.Count(i => !string.IsNullOrWhiteSpace(i.Status));
+                int inProgress = total - closed;
+
+                document.Add(new Paragraph($"Всего инцидентов: «{total}», Закрыто: «{closed}», На исполнении: «{inProgress}»", cellFont));
+                document.Add(new Paragraph(" ", cellFont));
+
+                // Таблица (9 колонок как в Excel)
+                var table = new PdfPTable(9)
+                {
+                    WidthPercentage = 100
+                };
+
+                // Ширины колонок (подбираем разумно)
+                table.SetWidths(new float[] { 1.2f, 2.2f, 2.0f, 3.2f, 2.2f, 1.2f, 2.2f, 2.2f, 1.4f });
+
+                // Заголовки колонок
+                AddHeaderCell(table, "№", headerFont);
+                AddHeaderCell(table, "Время регистрации", headerFont);
+                AddHeaderCell(table, "Сервис", headerFont);
+                AddHeaderCell(table, "Краткое описание", headerFont);
+                AddHeaderCell(table, "Заявитель", headerFont);
+                AddHeaderCell(table, "Приоритет", headerFont);
+                AddHeaderCell(table, "Исполнитель", headerFont);
+                AddHeaderCell(table, "Время решения", headerFont);
+                AddHeaderCell(table, "Статус", headerFont);
+
+                // Данные
+                foreach (var incident in incidents)
+                {
+                    AddBodyCell(table, incident.NumerIncident.ToString(), cellFont);
+                    AddBodyCell(table, incident.RegistrationTime ?? "", cellFont);
+                    AddBodyCell(table, incident.Service ?? "", cellFont);
+                    AddBodyCell(table, incident.ShortDescription ?? "", cellFont);
+                    AddBodyCell(table, incident.Applicant ?? "", cellFont);
+                    AddBodyCell(table, incident.Priority ?? "", cellFont);
+                    AddBodyCell(table, incident.Executor ?? "", cellFont);
+                    AddBodyCell(table, incident.DecisionTime ?? "", cellFont);
+                    AddBodyCell(table, string.IsNullOrWhiteSpace(incident.Status) ? "—" : incident.Status, cellFont);
+                }
+
+                document.Add(table);
+                document.Close();
+
+                return ms.ToArray();
+            });
+        }
+
+        // Хелперы для ячеек (добавь тоже внутрь класса ReportGeneratorService)
+        private static void AddHeaderCell(PdfPTable table, string text, Font font)
+        {
+            var cell = new PdfPCell(new Phrase(text, font))
+            {
+                HorizontalAlignment = Element.ALIGN_CENTER,
+                VerticalAlignment = Element.ALIGN_MIDDLE,
+                BackgroundColor = new BaseColor(230, 230, 230),
+                Padding = 5f
+            };
+            table.AddCell(cell);
+        }
+
+        private static void AddBodyCell(PdfPTable table, string text, Font font)
+        {
+            var cell = new PdfPCell(new Phrase(text ?? "", font))
+            {
+                HorizontalAlignment = Element.ALIGN_CENTER,
+                VerticalAlignment = Element.ALIGN_MIDDLE,
+                Padding = 4f
+            };
+            table.AddCell(cell);
+        }
     }
 }
 

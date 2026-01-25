@@ -23,7 +23,12 @@ namespace ReportGenerator.Controllers
 
         private static Vector<string> _vector = new Vector<string>();
         private static Utils.List<string> _list = new Utils.List<string>();
-
+        private static string GetLogFilePath()
+        {
+            // В контейнере это будет /app/bin/Debug/net9.0/
+            // На Windows (в Visual Studio без контейнера) — ...\bin\Debug\net9.0\
+            return Path.Combine(AppContext.BaseDirectory, "log.txt");
+        }
         public HomeController()
         {
             _dbIncidentController = new(_connectionString);
@@ -260,46 +265,54 @@ namespace ReportGenerator.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult ClearLog()
         {
+            var logPath = GetLogFilePath();
+
+            if (!System.IO.File.Exists(logPath))
+                return Content($"Файл лога не найден: {logPath}");
+
             try
             {
-                string logFilePath = Path.Combine(Directory.GetCurrentDirectory(), "log.txt");
+                // Truncate даже если кто-то читает, и часто проходит даже при записи,
+                // если логгер открывает файл с шарингом.
+                using var fs = new FileStream(
+                    logPath,
+                    FileMode.Open,
+                    FileAccess.Write,
+                    FileShare.ReadWrite
+                );
 
-                if (System.IO.File.Exists(logFilePath))
-                {
-                    System.IO.File.WriteAllText(logFilePath, string.Empty);
-                    Logger.Instance.Info("Лог-файл был очищен");
-                    return Json(new { success = true, message = "Лог-файл успешно очищен" });
-                }
-
-                return Json(new { success = false, message = "Файл лога не найден" });
+                fs.SetLength(0);
+                fs.Flush(true);
             }
-            catch (Exception ex)
+            catch (IOException)
             {
-                Logger.Instance.Error($"Ошибка при очистке лога: {ex.Message}");
-                return Json(new { success = false, message = $"Ошибка: {ex.Message}" });
+                // Если файл реально залочен — делаем ротацию:
+                // переименовали старый, создали новый пустой.
+                var rotated = Path.Combine(
+                    Path.GetDirectoryName(logPath)!,
+                    $"log_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.txt"
+                );
+
+                System.IO.File.Move(logPath, rotated, overwrite: true);
+                System.IO.File.WriteAllText(logPath, string.Empty);
             }
+
+            return RedirectToAction("LogInfo"); // или как у тебя страница логов называется
         }
 
         [HttpGet]
         public IActionResult DownloadLog()
         {
-            try
-            {
-                string logFilePath = Path.Combine(Directory.GetCurrentDirectory(), "log.txt");
+            var logPath = GetLogFilePath();
 
-                if (System.IO.File.Exists(logFilePath))
-                {
-                    var fileBytes = System.IO.File.ReadAllBytes(logFilePath);
-                    return File(fileBytes, "text/plain", $"log_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
-                }
+            if (!System.IO.File.Exists(logPath))
+                return Content($"Файл лога не найден: {logPath}");
 
-                return NotFound("Файл лога не найден");
-            }
-            catch (Exception ex)
-            {
-                Logger.Instance.Error($"Ошибка при скачивании лога: {ex.Message}");
-                return StatusCode(500, $"Ошибка: {ex.Message}");
-            }
+            // Важно: читаем байты и отдаём как файл
+            var bytes = System.IO.File.ReadAllBytes(logPath);
+            var fileName = $"log_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.txt";
+
+            return File(bytes, "text/plain; charset=utf-8", fileName);
         }
 
         #endregion

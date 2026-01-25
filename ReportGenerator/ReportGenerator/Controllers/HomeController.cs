@@ -265,15 +265,18 @@ namespace ReportGenerator.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult ClearLog()
         {
-            var logPath = GetLogFilePath();
+            // ВАЖНО: чистим именно тот файл, куда пишет Logger
+            var logPath = Logger.Instance.LogFilePath;
+
+            if (string.IsNullOrWhiteSpace(logPath))
+                return Json(new { success = false, message = "Путь к лог-файлу пустой." });
 
             if (!System.IO.File.Exists(logPath))
-                return Content($"Файл лога не найден: {logPath}");
+                return Json(new { success = false, message = $"Файл лога не найден: {logPath}" });
 
             try
             {
-                // Truncate даже если кто-то читает, и часто проходит даже при записи,
-                // если логгер открывает файл с шарингом.
+                // Надёжная «обрезка» файла до 0 байт
                 using var fs = new FileStream(
                     logPath,
                     FileMode.Open,
@@ -283,21 +286,14 @@ namespace ReportGenerator.Controllers
 
                 fs.SetLength(0);
                 fs.Flush(true);
+
+                return Json(new { success = true, message = "Лог очищен." });
             }
-            catch (IOException)
+            catch (Exception ex)
             {
-                // Если файл реально залочен — делаем ротацию:
-                // переименовали старый, создали новый пустой.
-                var rotated = Path.Combine(
-                    Path.GetDirectoryName(logPath)!,
-                    $"log_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.txt"
-                );
-
-                System.IO.File.Move(logPath, rotated, overwrite: true);
-                System.IO.File.WriteAllText(logPath, string.Empty);
+                Logger.Instance.Error($"ClearLog: ошибка очистки лога: {ex.Message}");
+                return StatusCode(500, new { success = false, message = $"Ошибка очистки: {ex.Message}" });
             }
-
-            return RedirectToAction("LogInfo"); // или как у тебя страница логов называется
         }
 
         [HttpGet]

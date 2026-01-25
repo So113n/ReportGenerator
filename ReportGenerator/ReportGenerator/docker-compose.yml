@@ -16,6 +16,7 @@ services:
       - Glpi__Priority=3
       - Glpi__Status=1
       - LogWatcher__LogFilePath=/app/Scripts/events.log
+      - TZ=Asia/Yekaterinburg
     extra_hosts:
       - "host.docker.internal:host-gateway"  # Добавляет host.docker.internal
     volumes:

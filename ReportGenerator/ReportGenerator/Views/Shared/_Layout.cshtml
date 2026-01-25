@@ -12,26 +12,25 @@
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">ReportGenerator</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Генератор отчетов</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="LogInfo">Логи</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Monitoring">Мониторинг</a>
-                        </li>
-                    </ul>
+        <nav class="navbar rg-navbar">
+            <div class="container rg-navbar-container">
+
+                <!-- Строка 1: логотип -->
+                <div class="rg-navbar-top">
+                    <a class="navbar-brand rg-brand" asp-area="" asp-controller="Home" asp-action="Index" title="На главную">
+                        <img src="/img/ar.logo.png" alt="ReportGenerator" class="rg-brand-logo" />
+                    </a>
                 </div>
+
+                <!-- Строка 2: меню -->
+                <div class="rg-navbar-bottom">
+                    <div class="rg-nav">
+                        <a class="rg-nav-link" asp-controller="Home" asp-action="Index">Генератор отчетов</a>
+                        <a class="rg-nav-link" asp-controller="Home" asp-action="LogInfo">Логи</a>
+                        <a class="rg-nav-link" asp-controller="Home" asp-action="Monitoring">Мониторинг</a>
+                    </div>
+                </div>
+
             </div>
         </nav>
     </header>

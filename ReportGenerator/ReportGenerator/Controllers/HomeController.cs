@@ -23,7 +23,12 @@ namespace ReportGenerator.Controllers
 
         private static Vector<string> _vector = new Vector<string>();
         private static Utils.List<string> _list = new Utils.List<string>();
-
+        private static string GetLogFilePath()
+        {
+            // В контейнере это будет /app/bin/Debug/net9.0/
+            // На Windows (в Visual Studio без контейнера) — ...\bin\Debug\net9.0\
+            return Path.Combine(AppContext.BaseDirectory, "log.txt");
+        }
         public HomeController()
         {
             _dbIncidentController = new(_connectionString);
@@ -260,46 +265,50 @@ namespace ReportGenerator.Controllers
         [ValidateAntiForgeryToken]
         public IActionResult ClearLog()
         {
+            // ВАЖНО: чистим именно тот файл, куда пишет Logger
+            var logPath = Logger.Instance.LogFilePath;
+
+            if (string.IsNullOrWhiteSpace(logPath))
+                return Json(new { success = false, message = "Путь к лог-файлу пустой." });
+
+            if (!System.IO.File.Exists(logPath))
+                return Json(new { success = false, message = $"Файл лога не найден: {logPath}" });
+
             try
             {
-                string logFilePath = Path.Combine(Directory.GetCurrentDirectory(), "log.txt");
+                // Надёжная «обрезка» файла до 0 байт
+                using var fs = new FileStream(
+                    logPath,
+                    FileMode.Open,
+                    FileAccess.Write,
+                    FileShare.ReadWrite
+                );
 
-                if (System.IO.File.Exists(logFilePath))
-                {
-                    System.IO.File.WriteAllText(logFilePath, string.Empty);
-                    Logger.Instance.Info("Лог-файл был очищен");
-                    return Json(new { success = true, message = "Лог-файл успешно очищен" });
-                }
+                fs.SetLength(0);
+                fs.Flush(true);
 
-                return Json(new { success = false, message = "Файл лога не найден" });
+                return Json(new { success = true, message = "Лог очищен." });
             }
             catch (Exception ex)
             {
-                Logger.Instance.Error($"Ошибка при очистке лога: {ex.Message}");
-                return Json(new { success = false, message = $"Ошибка: {ex.Message}" });
+                Logger.Instance.Error($"ClearLog: ошибка очистки лога: {ex.Message}");
+                return StatusCode(500, new { success = false, message = $"Ошибка очистки: {ex.Message}" });
             }
         }
 
         [HttpGet]
         public IActionResult DownloadLog()
         {
-            try
-            {
-                string logFilePath = Path.Combine(Directory.GetCurrentDirectory(), "log.txt");
+            var logPath = GetLogFilePath();
 
-                if (System.IO.File.Exists(logFilePath))
-                {
-                    var fileBytes = System.IO.File.ReadAllBytes(logFilePath);
-                    return File(fileBytes, "text/plain", $"log_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
-                }
+            if (!System.IO.File.Exists(logPath))
+                return Content($"Файл лога не найден: {logPath}");
 
-                return NotFound("Файл лога не найден");
-            }
-            catch (Exception ex)
-            {
-                Logger.Instance.Error($"Ошибка при скачивании лога: {ex.Message}");
-                return StatusCode(500, $"Ошибка: {ex.Message}");
-            }
+            // Важно: читаем байты и отдаём как файл
+            var bytes = System.IO.File.ReadAllBytes(logPath);
+            var fileName = $"log_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.txt";
+
+            return File(bytes, "text/plain; charset=utf-8", fileName);
         }
 
         #endregion

@@ -94,30 +94,36 @@
         </div>
     </div>
 </div>
-
+<div style="display:none">
+        @Html.AntiForgeryToken()
+</div>
 @section Scripts {
     <script>
-        // Функция для очистки лога
-        function clearLog() {
-            if (confirm('Вы уверены, что хотите очистить лог-файл?')) {
-                fetch('@Url.Action("ClearLog")', {
+             async function clearLog() {
+            const tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+            const token = tokenEl ? tokenEl.value : '';
+
+            try {
+                const response = await fetch('/Home/ClearLog', {
                     method: 'POST',
                     headers: {
-                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                        'RequestVerificationToken': token
                     }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Лог успешно очищен');
-                        location.reload();
-                    } else {
-                        alert('Ошибка: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    alert('Ошибка сети: ' + error.message);
                 });
+
+                // если сервер вернул не-JSON, тут будет понятная ошибка
+                const data = await response.json();
+
+                if (data.success) {
+                    // Перезагрузка обновит список.
+                    // Учти: при загрузке страницы у тебя пишется "Открытие страницы - LogInfo",
+                    // поэтому после очистки появится минимум одна свежая запись.
+                    location.reload();
+                } else {
+                    alert(data.message || 'Не удалось очистить лог');
+                }
+            } catch (e) {
+                alert('Ошибка при очистке лога: ' + e.message);
             }
         }
 

@@ -56,14 +56,13 @@ namespace ReportGenerator.Services
                     int templateCapacity = lastTemplateDataRow - firstDataRow + 1; // 8 строк
 
                     // Сколько строк реально нужно под данные
-                    int rowsNeeded = Math.Max(total, 1); // хотя бы одна строка оставим
+                    int rowsNeeded = Math.Max(total, 1); 
 
                     // --- Подгоняем количество строк под наши данные ---
 
                     if (rowsNeeded > templateCapacity)
                     {
                         // Случай "за весь период" или когда данных много:
-                        // добавляем недостающие строки, как у тебя было.
                         int extraRows = rowsNeeded - templateCapacity;
 
                         var lastTemplateRow = worksheet.Row(lastTemplateDataRow);
@@ -114,7 +113,7 @@ namespace ReportGenerator.Services
                     dataRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
                     dataRange.Style.Alignment.WrapText = true;
 
-                    // Ширину колонок по-прежнему берём из шаблона (под печать они у тебя уже нормальные).
+                    // Ширину колонок по-прежнему берём из шаблона.
 
                     using (var memoryStream = new MemoryStream())
                     {
@@ -133,7 +132,7 @@ namespace ReportGenerator.Services
                 var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
 
                 // Подготовка шрифта с поддержкой кириллицы
-                // Fonts/arial.ttf у тебя копируется в output, поэтому берём из AppContext.BaseDirectory
+                // Fonts/arial.ttf копируется в output, поэтому берём из AppContext.BaseDirectory
                 var fontPath = Path.Combine(AppContext.BaseDirectory, "Fonts", "arial.ttf");
                 BaseFont baseFont;
 
@@ -143,8 +142,6 @@ namespace ReportGenerator.Services
                 }
                 else
                 {
-                    // Фолбэк: системный шрифт (на Linux-контейнере обычно есть DejaVu)
-                    // Если и он не подхватится — будет без кириллицы, поэтому лучше держать arial.ttf в output.
                     baseFont = BaseFont.CreateFont(BaseFont.HELVETICA, BaseFont.CP1252, BaseFont.NOT_EMBEDDED);
                 }
 
@@ -215,7 +212,6 @@ namespace ReportGenerator.Services
             });
         }
 
-        // Хелперы для ячеек (добавь тоже внутрь класса ReportGeneratorService)
         private static void AddHeaderCell(PdfPTable table, string text, Font font)
         {
             var cell = new PdfPCell(new Phrase(text, font))

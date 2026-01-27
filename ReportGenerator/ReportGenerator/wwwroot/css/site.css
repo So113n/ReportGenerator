@@ -110,32 +110,27 @@ tr:hover .log-entry {
   --ar-blue-dark: #164779;
 }
 
-/* Навбар колонкой: логотип сверху, меню снизу */
 .rg-navbar-container {
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-/* Лого-кнопка */
 .rg-brand {
   margin: 10px 0 6px 0;
   padding: 0;
 }
 
-/* Размер логотипа (подстрой под себя) */
 .rg-brand-logo {
   height: 200px;
   width: auto;
   display: block;
 }
 
-/* Чтобы бургер не уезжал в сторону, тоже центрируем */
 .rg-navbar .navbar-toggler {
   margin: 6px 0 8px 0;
 }
 
-/* Контейнер меню */
 .rg-nav{
   display: flex;
   gap: 10px;
@@ -144,7 +139,6 @@ tr:hover .log-entry {
   flex-wrap: wrap;
 }
 
-/* Стили именно для ссылок (не зависят от родителя) */
 .rg-nav-link{
   display: inline-flex;
   align-items: center;
@@ -163,13 +157,13 @@ tr:hover .log-entry {
   transition: background-color .15s ease, color .15s ease, border-color .15s ease;
 }
 
-/* На случай если у ссылок остался bootstrap-класс nav-link */
+
 .rg-nav-link.nav-link{
   color: var(--ar-blue) !important;
   padding: 6px 14px !important;
 }
 
-/* hover/focus */
+
 .rg-nav-link:hover,
 .rg-nav-link:focus{
   color: #ffffff !important;
@@ -179,14 +173,12 @@ tr:hover .log-entry {
   outline: none;
 }
 
-/* опционально: “активная” вкладка */
 .rg-nav-link.active{
   color: #ffffff !important;
   background-color: var(--ar-blue);
   border-color: var(--ar-blue);
 }
 
-/* Хедер-меню: убираем подчёркивание у ссылок */
 .header-nav a,
 .header-nav a:link,
 .header-nav a:visited,
@@ -195,7 +187,6 @@ tr:hover .log-entry {
     text-decoration: none !important;
 }
 
-/* Если Bootstrap добавляет underline где-то ещё — подстрахуемся */
 .header-nav .nav-link {
     text-decoration: none !important;
 }

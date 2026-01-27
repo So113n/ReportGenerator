@@ -284,7 +284,7 @@ namespace ReportGenerator.Database.DbControllers
 
         // Дополнительные вспомогательные методы
 
-        // Получение статистики по периодам (пример использования async/await)
+        // Получение статистики по периодам 
         public async Task<Dictionary<ReportPeriod, int>> GetIncidentsCountByPeriodsAsync()
         {
             var results = new Dictionary<ReportPeriod, int>();

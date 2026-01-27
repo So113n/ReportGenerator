@@ -53,11 +53,9 @@ namespace ReportGenerator.Services
             // In-App уведомления
             if (_config.EnableInAppNotifications)
             {
-                // Здесь можно добавить логику для веб-сокетов или SignalR
                 _logger.LogInformation("In-App уведомление: {Alert}", alert.Title);
             }
 
-            // Email уведомления
             if (_config.EnableEmailNotifications && _config.EmailRecipients.Any())
             {
                 SendEmailNotification(alert);

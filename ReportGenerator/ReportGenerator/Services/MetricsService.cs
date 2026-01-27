@@ -7,7 +7,6 @@ namespace ReportGenerator.Services
     {
         private readonly object _lock = new();
 
-        // Эти счётчики ты потом можешь дёргать из middleware/контроллеров
         private int _activeRequests;
         private int _exceptionCount;
         private int _databaseQueryCount;
@@ -40,10 +39,6 @@ namespace ReportGenerator.Services
             }
         }
 
-        /// <summary>
-        /// Пример простого расчёта средней загрузки CPU за короткий интервал.
-        /// Блокирует поток примерно на 500 мс, но для страницы мониторинга это ок.
-        /// </summary>
         private double GetCpuUsagePercent(Process process)
         {
             try
@@ -70,8 +65,6 @@ namespace ReportGenerator.Services
                 return 0;
             }
         }
-
-        // --- Дополнительные методы для инкрементов (можешь подключить потом через middleware) ---
 
         public void IncrementActiveRequests() => Interlocked.Increment(ref _activeRequests);
         public void DecrementActiveRequests() => Interlocked.Decrement(ref _activeRequests);

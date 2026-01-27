@@ -53,7 +53,6 @@ namespace ReportGenerator.Controllers
 
             try
             {
-                // Получаем путь к файлу лога (замените на ваш реальный путь)
                 string logFilePath;
                 logFilePath = Logger.Instance.LogFilePath;
 

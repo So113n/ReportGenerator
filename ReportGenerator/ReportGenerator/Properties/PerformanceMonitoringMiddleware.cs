@@ -35,7 +35,7 @@ namespace ReportGenerator.Middleware
                 // Логирование медленных запросов
                 if (stopwatch.ElapsedMilliseconds > 1000)
                 {
-                    _monitorService.IncrementExceptionCounter(); // Учитываем как "медленный запрос"
+                    _monitorService.IncrementExceptionCounter(); 
                 }
             }
         }
